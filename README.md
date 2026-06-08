@@ -185,43 +185,65 @@ vita test      # 发送测试通知验证各模块
 
 打榜 PK 系统基于 Cloudflare Workers + D1 + KV 实现，提供全球排行榜、PK 挑战、徽章系统。
 
-### 本地开发
+### 打榜系统部署（Cloudflare D1 + Workers + Pages）
 
+#### 前置条件
+1. 注册 [Cloudflare 账号](https://dash.cloudflare.com/sign-up)
+2. 安装 [Node.js](https://nodejs.org/) (>= 18)
+3. 安装 Wrangler CLI：
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   ```
+
+#### 步骤 1：创建 D1 数据库
 ```bash
 cd leaderboard
 npm install
-npm run dev          # 启动本地服务器，默认 http://localhost:8787
+npx wrangler d1 create vita-leaderboard-db
+```
+执行后会输出 database_id，记录此值。
+
+#### 步骤 2：配置 wrangler.toml
+将输出的 database_id 填入 `leaderboard/wrangler.toml`：
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "vita-leaderboard-db"
+database_id = "<填入你的 database_id>"
 ```
 
-### 数据库初始化
-
+#### 步骤 3：初始化数据库
 ```bash
-npm run db:create    # 创建 D1 数据库（首次）
-npm run db:migrate   # 运行 schema 迁移
-npm run db:seed      # （可选）填充种子数据
+npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/001_init.sql
+npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/002_indexes.sql
+npx wrangler d1 execute vita-leaderboard-db --file=db/seed.sql
 ```
 
-### 部署到生产
-
+#### 步骤 4：本地开发测试
 ```bash
-npm run deploy
+npx wrangler dev
+```
+访问 http://localhost:8787
+
+#### 步骤 5：部署到生产
+```bash
+npx wrangler deploy
 ```
 
-首次部署前需在 `leaderboard/wrangler.toml` 中填入实际的 D1 `database_id` 和 KV namespace `id`（通过 `wrangler d1 create` 和 `wrangler kv:namespace create` 获取）。
+#### 成本估算（Cloudflare 免费 Tier）
+| 资源 | 免费额度 | 预计用量 | 是否足够 |
+|------|---------|---------|---------|
+| Workers 请求 | 10万/天 | <1万/天 | ✅ |
+| D1 读取 | 500万/天 | <10万/天 | ✅ |
+| D1 存储 | 5 GB | <100 MB | ✅ |
+| Pages 带宽 | 无限 | — | ✅ |
 
-### 成本预估
-
-所有组件均可覆盖在 Cloudflare 免费 Tier 内：
-
-| 资源 | 免费额度 | 预估用量 | 费用 |
-|------|---------|---------|------|
-| Workers 请求 | 1000 万/月 | < 100 万 | $0 |
-| D1 存储 | 5 GB | < 10 MB | $0 |
-| D1 读行 | 50 亿/月 | < 10 万 | $0 |
-| KV 读 | 1000 万/月 | < 50 万 | $0 |
-| KV 存储 | 1 GB | < 1 MB | $0 |
-
-### API 端点
+#### 打榜 API 端点
+部署后 CLI 配置：
+```bash
+export VITA_LEADERBOARD_URL="https://vita-leaderboard.<your-subdomain>.workers.dev"
+```
 
 详细 API 规格见 `leaderboard/API.md`（7 个端点：注册、打卡、排行榜、统计、挑战发起、挑战详情、徽章列表）。
 
