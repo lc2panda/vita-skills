@@ -1,6 +1,6 @@
 ---
 name: vita-health
-description: 香草健康管理 — 久坐/用眼/喝水/提肛锻炼智能提醒，支持心流适配与打榜PK。在Claude Code/Codex等AI编码助手中自然触发健康提醒，无需安装独立App。
+description: 香草健康管理 — 久坐/用眼/喝水/凯格尔锻炼智能提醒系统，集成心流自适应、多通道通知和全球打榜PK。通过后台调度守护自然嵌入工作流，无需安装独立App。
 license: MIT
 compatibility: claude-code, codex, cherry-studio, windsurf, cursor, and 40+ agent-skills platforms
 metadata:
@@ -9,89 +9,174 @@ metadata:
 allowed-tools: bash, read, write
 ---
 
-# 香草健康管理（Vanilla Health Manager）
+# 香草健康管理（Vita Health Manager）
 
-香草健康管理是一套基于 AI Agent Skills 协议的跨平台健康提醒系统，面向知识工作者（程序员、设计师、内容创作者）设计。通过嵌入 AI 编码助手的 Skills 机制，在用户与 AI 协作的过程中自然触发健康提醒——不装 App、不切窗口、不失焦。
+基于 AI Agent Skills 协议的跨平台健康提醒系统，面向知识工作者（程序员、设计师、内容创作者）设计。通过后台调度守护进程 (`scripts/scheduler.sh`) 自然嵌入工作流，在用户专注编码时自动触发健康提醒——不装 App、不切窗口、不失焦。
 
-四大模块覆盖了久坐、用眼、饮水和盆底锻炼四个知识工作者最易忽视的健康维度，每个提醒参数均有顶级医学期刊/权威机构来源支撑。
+**核心入口**：`scripts/vita` — 统一 CLI，提供 start/stop/status/config/log/test/setup/leaderboard/version 等命令。
 
 ## 四大提醒模块
 
-### 1. 久坐提醒（sedentary）
-默认每 30 分钟提醒起身活动，最低中断 2 分钟。基于 *The Lancet* 元分析（Ekelund 2016）：每日久坐超过 8 小时且活动水平最低的人群，全因死亡风险升高 59%（HR=1.59）。采用三级递进提醒策略（信号型→火花型→促进型），基于 Fogg 行为模型。
+### 1. 久坐提醒 — `sedentary.sh`
+- **默认间隔**：30 分钟
+- **科学依据**：*The Lancet* 元分析（Ekelund 2016，9 项前瞻性研究），每日久坐 >8h 者全因死亡风险升高 59% (HR=1.59)；Yin 2024 元分析（7 项 RCT/451 人）证实每 30 分钟中断久坐显著降低餐后血糖 (SMD=-0.33)
+- **提醒策略**：三级递进——信号型（善意提醒）→ 火花型（动机激发）→ 促进型（简易动作引导），基于 Fogg 行为模型
+- **硬上限**：连续久坐 120 分钟强制提醒
+- **状态查询**：`bash scripts/sedentary.sh --status`
 
-### 2. 用眼提醒（eye-care）
-默认每 50 分钟提醒远眺 60 秒。改良自经典 20-20-20 规则，融合超日节律研究与注意力科学，在打断频率与眼保护效果之间折中。引导用户远眺 6 米外 + 有意识眨眼 15 次以重建泪膜。
+### 2. 用眼提醒 — `eye-care.sh`
+- **默认间隔**：50 分钟
+- **科学依据**：Johnson & Rosenfield 2023 系统综述，超日节律 90 分钟（Kleitman BRAC），注意力子周期 50 分钟
+- **动作指导**：远眺 6 米外（松弛睫状肌）+ 有意识眨眼 15 次（重建泪膜）
+- **统计查询**：`bash scripts/eye-care.sh --status`
 
-### 3. 喝水提醒（hydration）
-默认每 75 分钟提醒饮水 200mL，每日总目标男性 2000mL、女性 1600mL（基于 NASEM/EFSA/中国营养学会三源交叉验证）。含进度反馈机制——研究证实进度反馈效果优于简单提示（Hydroprompt 2016）。
+### 3. 喝水提醒 — `hydration.sh`
+- **默认间隔**：75 分钟
+- **单次建议**：200mL
+- **科学依据**：NASEM/EFSA/中国营养学会三源交叉验证；Wittbrodt 2018 证实 1-2% 脱水即损害注意力与执行功能
+- **时间窗口**：09:00-18:00，持续运行模式
+- **进度查询**：`bash scripts/hydration.sh --status`
 
-### 4. 提肛锻炼提醒（kegel）
-每日 3 次提醒盆底肌训练（PFMT），分阶段方案从初学者（3s 保持）到巩固期（10s 保持）。基于 Cochrane 2024 系统综述——PFMT 为尿失禁一线推荐疗法。提醒文案使用含蓄表述保护用户隐私。支持男女两性特定指导。
+### 4. 凯格尔训练 — `kegel.sh`
+- **默认频率**：每日 3 次
+- **科学依据**：Cochrane 2024 系统综述（63 RCT/4,920 人），PFMT 为尿失禁一线推荐疗法 (RR=8.38)；Cleveland Clinic + NIH/NIDDK 临床指导
+- **训练方案**：四阶段进阶——初学者（3s 保持）→ 过渡期（5s）→ 标准期（8s）→ 巩固期（10s）
+- **隐私保护**：默认启用 `privacy_mode`，使用含蓄文案保护用户隐私
+- **支持男女两性**：gender-aware 差异化指导
 
-## 心流适配与强提醒机制
+## 核心架构
 
-在 Vibe Coding 场景下，健康提醒采取渐进式策略：
+### 调度守护 — `scripts/scheduler.sh`
+独立计时器管理四大模块提醒周期，集成心流检测、频道适配和自适应引擎的完整调度循环。由 `vita start` 命令启动后台运行。
 
-- **心流检测**：通过多维度信号（输入活跃度、代码变更速率、窗口焦点等）综合判定用户是否处于心流状态。
-- **渐进提醒**：未在心流中 → 标准弹窗；心流中 <30 分钟 → 温和 Toast；30-60 分钟 → 状态栏文字；>60 分钟 → 半透明 Overlay + AI 上下文暂存。
-- **AI 托管过渡**：触发强提醒后，AI 自动暂存当前任务上下文，用户选择休息/推迟/跳过，休息结束后自动恢复上下文。
+### 心流检测 — `scripts/flow-detector.sh`
+- **检测方式**：基于进程名称的启发式判定（预设高专注应用列表：Xcode、Terminal、VSCode、IntelliJ IDEA 等）
+- **四级判定**：
+  - none（无）→ 正常提醒，延迟 1.0x
+  - light（轻）→ 正常提醒，延迟 1.5x
+  - medium（中）→ 温和通知，延迟 2.5x
+  - deep（深）→ 微妙通知，延迟 4.0x
+- **联动调度器**：scheduler.sh 每次触发前调用 flow-detector.sh 判定当前状态
+
+### 自适应引擎 — `scripts/adaptive-engine.sh`
+- **评分系统**：0-100 忠诚度评分，初始 50
+- **响应驱动**：完成 +10 / 忽略 -5 / 延迟 -3
+- **频率调节**：
+  - 0-30（需关注）→ 1.5x 加速提醒
+  - 30-60（标准）→ 1.0x 正常频率
+  - 60-80（良好）→ 0.8x 适度放宽
+  - 80-100（优秀）→ 0.6x 低频提醒
+- **段位系统**：钻石 (80+) / 黄金 (60-79) / 白银 (30-59) / 青铜 (0-29)
+
+### 多通道通知 — `scripts/channel-adapter.sh`
+按优先级分发：桌面弹窗 → 终端回显 → TTS 语音 → 静默日志。当桌面环境不可用时自动降级至 log_only 安全模式。
+
+### 智能抑制 — `scripts/lib/common.sh`
+- 安静时段 (23:00-07:00) → 仅日志
+- 会议中（摄像头使用）→ 静默
+- 锁屏 → 暂停
+- 用户空闲 >5 分钟 → 暂停
 
 ## 安装与配置
 
+### 首次安装
+
 ```bash
-# 方式 1：npx skills add（通用，兼容 40+ 平台）
-npx skills add <repo-url>
-
-# 方式 2：Claude Code Marketplace
-/plugin marketplace add <repo-url>
-/plugin install vanilla-health-skills@vanilla-health
-
-# 方式 3：手动 symlink（Claude Code）
-ln -s /path/to/vanilla-health-skills/skills/health-sedentary ~/.claude/skills/health-sedentary
+cd scripts
+bash install.sh interactive
 ```
 
-配置文件位于 `config/default.yaml`，用户可覆盖至 `~/.vanilla-health/config.yaml`：
+安装向导交互流程：目录创建 → 默认配置复制 → 个性化间隔设置 → 打榜昵称设置 → Shell alias 添加 → 开机自启配置。
 
-```yaml
-health-eye-care:
-  enabled: true
-  interval_minutes: 50
-  break_seconds: 60
+### 启动守护
+
+```bash
+vita start
 ```
 
-## 使用示例
+### 配置文件
 
-在 Claude Code 对话中自然触发：
+默认配置：`config/default.yaml`（126 行，涵盖四大模块/打榜/守护/心流/通道/抑制/自适应全部参数）
+用户配置：`~/.vita/config/config.yaml`（安装向导自动生成）
+Schema 校验：`config/schema.yaml`（JSON Schema Draft-07）
 
-> 用户："写一个排序算法"
-> （AI 正常工作...）
-> （约 50 分钟后自动触发）→ "已连续注视屏幕约 50 分钟。休息眼睛 | 远眺 6 米外 | 眨眼 15 次"
+编辑配置：
+```bash
+vita config edit
+```
 
-用户亦可主动调用：
-- `/health-sedentary status` — 查看久坐统计
-- `/health-eye-care` — 立即触发用眼休息引导
-- `/health-hydration stats` — 查看今日饮水进度
-- `/health-kegel begin` — 开始一次凯格尔训练
+## 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `vita start` | 启动后台调度守护 |
+| `vita stop` | 停止守护进程 |
+| `vita status` | 运行状态 + 今日统计 + 忠诚度评分 |
+| `vita config` | 查看当前配置 |
+| `vita config edit` | 编辑配置文件 |
+| `vita log [N]` | 查看最近 N 条日志 |
+| `vita test` | 发送所有模块测试通知 |
+| `vita setup` | 重新运行安装向导 |
+| `vita leaderboard` | 查看打榜排名与连续打卡天数 |
+
+命令行入口：`scripts/vita`（bash 脚本，9 个子命令）
 
 ## 打榜 PK 系统
 
-基于 Cloudflare D1 + Workers + Pages 的隐私优先打榜系统：
+### 服务端 — `leaderboard/`
+基于 Cloudflare Workers + D1 + KV 实现：
+- **7 个 REST API 端点**：注册、打卡、排行榜、统计、挑战发起、挑战详情、徽章列表
+- **防作弊**：HMAC 签名验证、频率限制 (3 req/s)、时间窗口校验、异常检测
+- **隐私**：伪匿名 ID、部分掩码、可选匿名模式、可选退出排行榜、完整导出/删除
+- **成本**：完全覆盖在 Cloudflare 免费 Tier 内（预估月用量远低于免费额度）
+- **详见**：`leaderboard/API.md`、`leaderboard/README.md`
 
-- **伪匿名排行**：用户 ID 为 `sha256(user_secret)`，排行榜显示部分掩码
-- **防作弊**：5 层机制（HMAC 签名验证、频率限制、时间窗口、异常检测、组数上限）
-- **社交激励**：连胜记录、成就徽章、等级系统、匿名天梯、7 天 PK 赛
-- **隐私保护**：Opt-in 排行榜、数据导出/删除 API、最小化数据采集
+### 客户端 — `scripts/lib/leaderboard-client.sh`
+处理 API 调用、签名生成、离线队列和自动重试。由 `kegel.sh` 和 `install.sh` 集成调用。用户昵称由 `scripts/lib/nickname-validator.sh` 校验。
+
+## 共享库 — `scripts/lib/`
+
+| 文件 | 职责 |
+|------|------|
+| `common.sh` | 公共工具（日志/配置/通知/心流检测/状态管理） |
+| `flow-detector.sh` | 心流判定逻辑 |
+| `channel-adapter.sh` | 多通道分发逻辑 |
+| `adaptive-engine.sh` | 自适应评分引擎 |
+| `leaderboard-client.sh` | 打榜 API 客户端 |
+| `name-validator.sh` | 名称合法性校验 |
+| `nickname-validator.sh` | 昵称格式与敏感词校验 |
+
+## 测试
+
+```bash
+bash tests/test-scheduler.sh        # 8 模块集成测试，45+ 断言
+bash leaderboard/tests/api.test.sh  # 打榜 API 端点测试
+vita test                           # 端到端通知测试
+```
 
 ## 科学依据
 
-本产品的每个参数均源自顶级医学期刊与权威机构：
+所有默认参数均基于独立发表、经过同行评议的科学文献，每个参数至少 3 个独立来源交叉验证。
 
 | 核心结论 | 独立来源数 | 代表性来源 |
 |---------|-----------|-----------|
-| 久坐 >8h/d 增加 59% 全因死亡风险 | 3 | *The Lancet* Ekelund 2016 |
-| 每 30 分钟中断久坐为最佳间隔 | 4 | *Scand J Med Sci Sports* Yin 2024 |
-| 1-2% 脱水即损害注意力与执行功能 | 5 | *Med Sci Sports Exerc* Wittbrodt 2018 |
-| PFMT 为尿失禁一线疗法 | 3 | *Cochrane* Hay-Smith 2024 |
+| 久坐 >8h/d 增加 59% 全因死亡风险 | 3+ | *The Lancet* Ekelund 2016 (HR=1.59, 95%CI 1.52-1.66) |
+| 每 30 分钟中断久坐为最佳间隔 | 4+ | *Scand J Med Sci Sports* Yin 2024 (SMD=-0.33, 95%CI -0.59 to -0.07) |
+| 20-20-20 规则缓解数字眼疲劳 | 4+ | Johnson & Rosenfield 2023 systematic review |
+| 1-2% 脱水即损害注意力与执行功能 | 5+ | *Med Sci Sports Exerc* Wittbrodt 2018 meta-analysis |
+| PFMT 为尿失禁一线疗法 (RR=8.38) | 3+ | *Cochrane* Dumoulin 2024 (63 RCT/4,920 participants) |
+| 渐进式提醒比固定频率更有效 | 2+ | Fogg Behavior Model, Hydroprompt 2016 |
 
-完整科学依据及来源编号详见 `references/health-guidelines.md`。
+**完整科学依据、来源编号与交叉验证矩阵**详见 `references/health-guidelines.md`（45+ 独立来源）。各领域研究文献综述见根目录 `sedentary-research.md`、`eye-care-research.md`、`hydration-research.md`、`kegel-research.md`。
+
+## 子代理协作模式
+
+当嵌入 AI Agent Skills 平台运行时，本 Skill 使用以下子代理分工：
+
+- **调度子代理**：运行 `scripts/scheduler.sh`，负责计时器管理与触发分发
+- **检测子代理**：运行 `scripts/flow-detector.sh`，判定当前心流等级
+- **提醒子代理**：运行 `scripts/sedentary.sh` / `eye-care.sh` / `hydration.sh` / `kegel.sh`，生成并发送提醒
+- **适配子代理**：运行 `scripts/adaptive-engine.sh`，根据用户响应更新评分
+- **打榜子代理**：通过 `scripts/lib/leaderboard-client.sh` 上报打卡数据
+
+子代理间通过 state 文件 (`~/.vita/state/`) 共享状态，调度器负责协调生命周期。

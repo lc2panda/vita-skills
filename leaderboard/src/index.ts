@@ -21,6 +21,7 @@ import type {
   BadgeRecord,
 } from './types';
 import { BADGE_DEFINITIONS, computeLevel, computeCheckinScore } from './types';
+import { handleScheduled } from './cron/daily-stats';
 
 // ============================================================
 // 应用初始化
@@ -307,8 +308,9 @@ app.post('/api/checkin', async (c) => {
 });
 
 // ============================================================
-// 2. GET /api/leaderboard — 排行榜
+// 2. GET /api/leaderboard — 排行榜（weekly / monthly / alltime）
 // ============================================================
+// D1 prepared statements：日期参数绑定，杜绝字符串拼接
 
 app.get('/api/leaderboard', async (c) => {
   const type: LeaderboardType = (c.req.query('type') as LeaderboardType) || 'alltime';
@@ -316,39 +318,44 @@ app.get('/api/leaderboard', async (c) => {
 
   const db = c.env.DB;
 
-  // 根据时间范围聚合 checkins
-  let dateFilter = '';
-  if (type === 'weekly') {
-    dateFilter = `AND c.date >= date('now', '-7 days')`;
-  } else if (type === 'monthly') {
-    dateFilter = `AND c.date >= date('now', '-30 days')`;
+  // 计算 N 天前日期（Asia/Shanghai 时区）
+  function dateNDaysAgo(n: number): string {
+    const d = new Date(Date.now() + 8 * 3600_000 - n * 86400_000);
+    return d.toISOString().slice(0, 10);
   }
 
-  // 聚合查询：按 user_id 汇总
-  const rows = await db.prepare(`
-    SELECT
-      u.id,
-      u.display_name,
-      u.opt_in_leaderboard,
-      u.streak,
-      u.level,
-      SUM(c.sets_completed) AS total_sets,
-      COUNT(CASE WHEN c.reps_per_set >= 15 THEN 1 END) AS perfect_count
-    FROM users u
-    INNER JOIN checkins c ON c.user_id = u.id
-    WHERE 1=1 ${dateFilter}
+  // SQL 片段：SELECT 列 / FROM + JOIN / GROUP + ORDER + LIMIT
+  const cols = `
+    u.id, u.display_name, u.opt_in_leaderboard,
+    u.streak, u.level,
+    SUM(c.sets_completed) AS total_sets,
+    COUNT(CASE WHEN c.reps_per_set >= 15 THEN 1 END) AS perfect_count
+  `;
+  const fromJoin = 'FROM users u INNER JOIN checkins c ON c.user_id = u.id';
+  const groupOrderLimit = `
     GROUP BY u.id
     ORDER BY (SUM(c.sets_completed) * 10 + u.streak * 5 + COUNT(CASE WHEN c.reps_per_set >= 15 THEN 1 END) * 5) DESC
     LIMIT ?
-  `).bind(limit).all<{
-    id: string;
-    display_name: string;
-    opt_in_leaderboard: number;
-    streak: number;
-    level: string;
-    total_sets: number;
-    perfect_count: number;
-  }>();
+  `;
+
+  let rows: D1Result<{
+    id: string; display_name: string; opt_in_leaderboard: number;
+    streak: number; level: string; total_sets: number; perfect_count: number;
+  }>;
+
+  if (type === 'weekly') {
+    rows = await db.prepare(
+      `SELECT ${cols} ${fromJoin} WHERE c.date >= ? ${groupOrderLimit}`,
+    ).bind(dateNDaysAgo(7), limit).all();
+  } else if (type === 'monthly') {
+    rows = await db.prepare(
+      `SELECT ${cols} ${fromJoin} WHERE c.date >= ? ${groupOrderLimit}`,
+    ).bind(dateNDaysAgo(30), limit).all();
+  } else {
+    rows = await db.prepare(
+      `SELECT ${cols} ${fromJoin} ${groupOrderLimit}`,
+    ).bind(limit).all();
+  }
 
   const entries: LeaderboardEntry[] = rows.results.map((row, idx) => {
     const score = row.total_sets * 10 + row.streak * 5 + row.perfect_count * 5;
@@ -557,3 +564,6 @@ app.onError((err, c) => {
 });
 
 export default app;
+
+// Cron Worker 入口：每日凌晨聚合统计（wrangler.toml triggers.crons 驱动）
+export { handleScheduled as scheduled };
