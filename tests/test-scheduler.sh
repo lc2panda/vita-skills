@@ -182,13 +182,13 @@ test_channel_notification() {
 
     # 测试各 channel 启用状态
     local dtop_enabled
-    dtop_enabled=$(read_config "channels.desktop_notification.enabled" "true")
+    dtop_enabled=$(read_config "channels.desktop_notification" "true")
     assert "桌面通知 channel 可用" \
         "[[ -n '$dtop_enabled' ]]" \
         "enabled: $dtop_enabled"
 
     local term_enabled
-    term_enabled=$(read_config "channels.terminal_echo.enabled" "true")
+    term_enabled=$(read_config "channels.terminal_echo" "true")
     assert "终端回显 channel 可用" \
         "[[ -n '$term_enabled' ]]" \
         "enabled: $term_enabled"

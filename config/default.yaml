@@ -95,10 +95,10 @@ flow:
 # 多 Channel 配置 — 设计文档 §5.6
 # ═══════════════════════════════════════════════════════════════
 channels:
-  desktop_notification: { enabled: true, priority: 1 }
-  terminal_echo:        { enabled: true, priority: 2 }
-  tts:                  { enabled: false, priority: 3 }
-  log_only:             { enabled: true, priority: 4 }
+  desktop_notification: true
+  terminal_echo:        true
+  tts:                  false
+  log_only:             true
 
 # ═══════════════════════════════════════════════════════════════
 # 智能抑制规则 — 设计文档 §5.3
@@ -126,3 +126,10 @@ adaptive:
     - { score_min: 30, score_max: 60, multiplier: 1.0 }
     - { score_min: 60, score_max: 80, multiplier: 0.8 }
     - { score_min: 80, score_max: 100, multiplier: 0.6 }
+
+# ── 提肛锻炼提醒模块 ──
+health-kegel:
+  gender: neutral
+  start_date: "2026-06-08"
+  reminder_times: "09:00,13:00,20:00"
+  leaderboard_enabled: false

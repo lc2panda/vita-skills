@@ -90,7 +90,7 @@ channel_log() {
 
 is_channel_enabled() {
     local channel="$1"
-    local key="channels.${channel}.enabled"
+    local key="channels.${channel}"
     local val
     val=$(read_config "$key" "true")
     [[ "$val" == "true" ]] && return 0 || return 1
