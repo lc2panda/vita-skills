@@ -1,54 +1,47 @@
 --
--- Input:  执行于空 D1 数据库（wrangler d1 execute --file=./db/seed.sql）
--- Output: 成就类型定义 + 等级阈值初始数据
--- Pos:    leaderboard/db/seed.sql — 首版种子数据，Phase 3 部署流程第一步后立即执行
+-- Input:  D1 数据库种子数据（wrangler d1 execute）
+-- Output: Cloudflare D1 (SQLite) 预置数据 — 成就定义与统计基线
+-- Pos:   leaderboard/db/seed.sql — 种子数据，Phase 3 打榜系统初始化
 --
--- 香草健康管理 打榜 PK 系统 — 种子数据
--- 创建时间: 2026-06-08 15:30:00 +08:00 (Asia/Singapore)
+-- 香草健康管理 打榜 PK 系统 — D1 种子数据
+-- 创建时间: 2026-06-08 16:00:00 +08:00 (Asia/Singapore)
 
--- ============================================================
--- 成就徽章定义（§4.6 社交激励设计）
--- ============================================================
--- 此处作为参考注释留存，实际徽章由服务端逻辑根据规则自动授予。
--- 徽章类型标识与授予条件：
---
---   streak_7     — 连续打卡 7 天        | 初出茅庐
---   streak_30    — 连续打卡 30 天       | 月度冠军
---   streak_100   — 连续打卡 100 天      | 铁腚传奇
---   streak_365   — 连续打卡 365 天      | 极限挑战
---   streak_1000  — 连续打卡 1000 天     | 千日丰碑
---   total_1000   — 累计完成 1000 组     | 千组达成
---   early_bird   — 07:00 前完成当日打卡 | 晨型战士
---   night_owl    — 23:00 后完成当日打卡 | 夜猫子
---   perfect_week — 一周 7 天全勤        | 完美一周
---   pk_king      — 赢得 3 次以上 PK 赛  | PK 之王
---
--- 授予逻辑基于 UNIQUE(user_id, badge_type) 约束保证幂等。
+-- ============================================
+-- 预置成就徽章定义
+-- ============================================
+-- 系统级成就占位，后续由 Worker 根据用户行为动态授予
+-- badge_type 枚举: streak_3, streak_7, streak_30, early_bird, night_owl,
+--                  power_user, pk_winner, first_checkin, record_breaker
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'first_checkin', unixepoch());
 
--- ============================================================
--- 等级阈值定义（§4.6 等级系统）
--- ============================================================
--- 基于综合得分自动晋级，由排名算法（§4.5）计算：
---   total_score = 总打卡天数×1.0 + 当前连续×2.0 + 总完成组数×0.5 + 徽章数×10
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'streak_3', unixepoch());
 
--- level          | 总分范围     | 说明
--- ---------------+-------------+------------------
--- beginner       | 0 - 99      | 默认初始等级
--- intermediate   | 100 - 499   | 有一定积累
--- advanced       | 500 - 1999  | 资深战士
--- elite          | 2000 - 9999 | 精英级别
--- legend         | 10000+      | 传奇
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'streak_7', unixepoch());
 
--- ============================================================
--- 免打扰时段预设（系统级默认值）
--- ============================================================
--- 用户可在 ~/.vanilla-health/config.yaml 中覆盖
--- 默认免打扰：深夜 22:00 - 07:00 +08:00
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'streak_30', unixepoch());
 
--- ============================================================
--- 防作弊配置默认值（§4.4）
--- ============================================================
--- max_checkins_per_day    = 3     每日打卡上限
--- min_checkin_interval_s  = 1800  最小打卡间隔（秒）= 30 分钟
--- max_sets_per_checkin    = 3     单次打卡最大组数
--- max_sets_per_day        = 9     单日最大组数 = 3 次 × 3 组
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'early_bird', unixepoch());
+
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'night_owl', unixepoch());
+
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'power_user', unixepoch());
+
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'pk_winner', unixepoch());
+
+INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+VALUES ('system', 'record_breaker', unixepoch());
+
+-- ============================================
+-- 每日统计基线记录
+-- ============================================
+-- 哨兵记录，确保 daily_stats 不为空，供定时 Worker 聚合时作为基线
+INSERT OR IGNORE INTO daily_stats (date, total_checkins, active_users, avg_sets, top_user_id, top_score)
+VALUES ('1970-01-01', 0, 0, 0.0, 'system', 0);

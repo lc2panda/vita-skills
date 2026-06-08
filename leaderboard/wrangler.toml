@@ -10,7 +10,7 @@ compatibility_date = "2025-06-08"
 [[d1_databases]]
 binding = "DB"
 database_name = "vita-leaderboard-db"
-database_id = "YOUR_DATABASE_ID_HERE"  # ← 替换为实际 database_id
+database_id = "bb7d4268-af7c-4cbc-9b2d-23fa8cefd848"
 
 # ============================================
 # KV 命名空间（用于速率限制缓存）
@@ -33,6 +33,8 @@ crons = ["0 1 * * *"]
 bucket = "./src/frontend"
 
 # ============================================
-# 迁移目录
+# 数据库迁移
 # ============================================
-migrations_dir = "db/migrations"
+[[migrations]]
+tag = "v1"
+new_classes = []
