@@ -323,8 +323,89 @@ run_scheduler() {
     local hyd_interval;  hyd_interval=$(read_module_interval "hydration" "75")
     # kegel 使用 schedule，不设间隔
 
-    local tick
-    tick=$(read_config "daemon.tick_seconds" "10")
+    # ── 智能休眠 ──────────────────────────────────────────
+    # 计算到下一个提醒的最小时间，sleep 到那时再检查
+    # 减少 CPU 占用和无效轮询
+    _calc_sleep_seconds() {
+        local now; now=$(date +%s)
+        local min_sleep=99999
+        local s
+
+        # 久坐模块
+        local last
+        last=$(get_last_trigger "sedentary")
+        s=$(( (last + sed_interval * 60) - now ))
+        [[ $s -lt $min_sleep ]] && min_sleep=$s
+
+        # 护眼模块
+        last=$(get_last_trigger "eye-care")
+        s=$(( (last + eye_interval * 60) - now ))
+        [[ $s -lt $min_sleep ]] && min_sleep=$s
+
+        # 喝水模块
+        last=$(get_last_trigger "hydration")
+        s=$(( (last + hyd_interval * 60) - now ))
+        [[ $s -lt $min_sleep ]] && min_sleep=$s
+
+        # kegel 固定时间 — 使用 get_kegel_schedule 计算下次触发时间
+        local kegel_next
+        kegel_next=$(_next_kegel_epoch)
+        if [[ -n "$kegel_next" ]] && [[ "$kegel_next" -gt 0 ]]; then
+            s=$(( kegel_next - now ))
+            [[ $s -lt $min_sleep ]] && min_sleep=$s
+        fi
+
+        # 边界保护: 最少 1 秒，最多 tick 秒
+        [[ $min_sleep -lt 1 ]] && min_sleep=1
+        local max_sleep; max_sleep=$(read_config "daemon.tick_seconds" "10")
+        [[ $min_sleep -gt $max_sleep ]] && min_sleep=$max_sleep
+
+        echo "$min_sleep"
+    }
+
+    # 计算 kegel 下一次触发 epoch 秒
+    _next_kegel_epoch() {
+        local kegel_times
+        kegel_times=$(read_config "health-kegel.daily_schedule" "")
+        [[ -z "$kegel_times" ]] && kegel_times=$(read_config "modules.kegel.daily_schedule" "")
+        [[ -z "$kegel_times" ]] && echo "0" && return
+
+        local now; now=$(date +%s)
+        local today; today=$(date +%Y-%m-%d)
+        local next_epoch=0
+        local min_future=9999999999
+
+        for time_spec in $kegel_times; do
+            # 去除可能的前后空格和引号
+            time_spec="${time_spec//\"/}"
+            time_spec="${time_spec//\'/}"
+            time_spec="$(echo "$time_spec" | xargs)"
+            [[ -z "$time_spec" ]] && continue
+
+            local target_epoch
+            target_epoch=$(date -j -f "%Y-%m-%d %H:%M" "${today} ${time_spec}" +%s 2>/dev/null || true)
+            [[ -z "$target_epoch" ]] && continue
+
+            if [[ $target_epoch -gt $now ]] && [[ $target_epoch -lt $min_future ]]; then
+                min_future=$target_epoch
+            fi
+        done
+
+        [[ $min_future -lt 9999999999 ]] && echo "$min_future" && return
+        # 今天所有时间已过，返回明天第一个时间
+        local tomorrow; tomorrow=$(date -j -v+1d +%Y-%m-%d 2>/dev/null || date -d "tomorrow" +%Y-%m-%d 2>/dev/null || echo "")
+        [[ -z "$tomorrow" ]] && echo "0" && return
+        for time_spec in $kegel_times; do
+            time_spec="${time_spec//\"/}"
+            time_spec="${time_spec//\'/}"
+            time_spec="$(echo "$time_spec" | xargs)"
+            [[ -z "$time_spec" ]] && continue
+            local target_epoch
+            target_epoch=$(date -j -f "%Y-%m-%d %H:%M" "${tomorrow} ${time_spec}" +%s 2>/dev/null || true)
+            [[ -n "$target_epoch" ]] && [[ $target_epoch -lt $min_future ]] && min_future=$target_epoch
+        done
+        [[ $min_future -lt 9999999999 ]] && echo "$min_future" || echo "0"
+    }
 
     # 主循环
     while true; do
@@ -344,8 +425,10 @@ run_scheduler() {
         # 检查固定时间的 kegel
         check_kegel_schedule
 
-        # 等待
-        sleep "$tick"
+        # 智能休眠：计算到下一个提醒的最小时间
+        local _sleep_sec
+        _sleep_sec=$(_calc_sleep_seconds)
+        sleep "$_sleep_sec"
     done
 }
 

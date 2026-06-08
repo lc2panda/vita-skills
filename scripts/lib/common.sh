@@ -18,6 +18,9 @@ readonly STATE_DIR_DEFAULT="${VITA_ROOT}/state"
 _COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_CONFIG_DIR="$(cd "${_COMMON_DIR}/../../config" 2>/dev/null && pwd || echo '')"
 
+# 懒加载基路径（指向 lib 目录，供 notify.sh / suppression.sh 等使用）
+readonly _LAZY_BASE="${_COMMON_DIR}"
+
 # ── 确保目录存在 ─────────────────────────────────────────────
 _ensure_dir() {
     local dir="$1"
@@ -83,7 +86,25 @@ read_config() {
         return 0
     fi
 
-    # 2. 按层级读取 YAML 文件
+    # 2. 配置缓存（基于文件 mtime，有效期 5 分钟）
+    local _config_cache_dir="${STATE_DIR_DEFAULT}/cache/config"
+    local _config_cache_ttl=300
+    local _cache_key_safe="${key_path//\//_}"
+    local _cache_file="${_config_cache_dir}/${_cache_key_safe}"
+    if [[ -f "$_cache_file" ]]; then
+        local _cache_ts _now
+        _cache_ts=$(stat -f '%m' "$_cache_file" 2>/dev/null || stat -c '%Y' "$_cache_file" 2>/dev/null || echo "0")
+        _now=$(date +%s)
+        # 检查缓存是否在 TTL 内，且不早于配置文件 mtime
+        local _config_mtime
+        _config_mtime=$(stat -f '%m' "$config_file" 2>/dev/null || stat -c '%Y' "$config_file" 2>/dev/null || echo "0")
+        if [[ $((_now - _cache_ts)) -lt $_config_cache_ttl ]] && [[ "$_cache_ts" -ge "$_config_mtime" ]]; then
+            cat "$_cache_file" 2>/dev/null
+            return 0
+        fi
+    fi
+
+    # 3. 按层级读取 YAML 文件
     if [[ ! -f "$config_file" ]]; then
         printf '%s' "$default_value"
         return 0
@@ -153,11 +174,13 @@ read_config() {
 
                 # 处理内联空数组 []
                 if [[ "$val" == "[]" ]]; then
-                    printf ''
+                    _ensure_dir "$_config_cache_dir" 2>/dev/null || true
+                    printf '' | tee "$_cache_file" 2>/dev/null
                     return 0
                 fi
 
-                printf '%s' "$val"
+                _ensure_dir "$_config_cache_dir" 2>/dev/null || true
+                printf '%s' "$val" | tee "$_cache_file" 2>/dev/null
                 return 0
             fi
         fi
@@ -165,52 +188,30 @@ read_config() {
 
     # 循环结束后，如果仍在收集列表，输出已收集的值
     if [[ "$collecting_list" == true ]]; then
-        printf '%s' "$list_values"
+        _ensure_dir "$_config_cache_dir" 2>/dev/null || true
+        printf '%s' "$list_values" | tee "$_cache_file" 2>/dev/null
         return 0
     fi
 
-    # 3. 未匹配则返回默认值
-    printf '%s' "$default_value"
+    # 4. 未匹配则返回默认值
+    _ensure_dir "$_config_cache_dir" 2>/dev/null || true
+    printf '%s' "$default_value" | tee "$_cache_file" 2>/dev/null
 }
 
-# ── 系统通知（跨平台） ───────────────────────────────────────
+# ── 系统通知（跨平台，懒加载） ─────────────────────────────────
 # Usage: send_notification <title> <message> [sound]
-# 返回: 0 成功, 1 失败
+# 首次调用时懒加载 notify.sh 以节省启动时间
 send_notification() {
-    local title="${1:-香草健康}"
-    local message="${2:-}"
-    local sound="${3:-Glass}"
-
-    # macOS: 优先使用 terminal-notifier，回退到 osascript
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        if command -v terminal-notifier &>/dev/null; then
-            terminal-notifier \
-                -title "$title" \
-                -message "$message" \
-                -sound "$sound" \
-                -timeout 5 \
-                2>/dev/null && return 0
-        fi
-        # 回退到 osascript（系统内置）
-        osascript -e "display notification \"$message\" with title \"$title\" sound name \"$sound\"" 2>/dev/null && return 0
-        # 最后的回退：纯文本输出（cron 场景）
+    if [[ -f "${_LAZY_BASE}/notify.sh" ]]; then
+        source "${_LAZY_BASE}/notify.sh" || true
+    else
+        local title="${1:-通知}" message="${2:-}"
         printf '[%s] %s: %s\n' "$(get_timestamp)" "$title" "$message" >&2
         return 1
     fi
-
-    # Linux: notify-send
-    if [[ "$(uname -s)" == "Linux" ]]; then
-        if command -v notify-send &>/dev/null; then
-            notify-send "$title" "$message" --expire-time=5000 2>/dev/null && return 0
-        fi
-        printf '[%s] %s: %s\n' "$(get_timestamp)" "$title" "$message" >&2
-        return 1
-    fi
-
-    # 未知平台：输出到 stderr
-    printf '[%s] %s: %s\n' "$(get_timestamp)" "$title" "$message" >&2
-    return 1
+    send_notification "$@"
 }
+
 
 # ── 心流检测 ─────────────────────────────────────────────────
 # 通过检测 shell history 文件最近修改时间来判定终端活跃度
@@ -328,15 +329,20 @@ write_state() {
     state_file="$(get_state_file "$module")"
 
     if [[ -f "$state_file" ]]; then
+        # 原子写入：先写临时文件，再 mv，防止并发写损坏
+        local _tmp_state="${state_file}.tmp.$$"
         if grep -q "^${key}=" "$state_file" 2>/dev/null; then
             # macOS 兼容 sed
             if [[ "$(uname -s)" == "Darwin" ]]; then
-                sed -i '' "s|^${key}=.*|${key}=${value}|" "$state_file"
+                sed "s|^${key}=.*|${key}=${value}|" "$state_file" > "$_tmp_state"
             else
-                sed -i "s|^${key}=.*|${key}=${value}|" "$state_file"
+                sed "s|^${key}=.*|${key}=${value}|" "$state_file" > "$_tmp_state"
             fi
+            mv "$_tmp_state" "$state_file"
         else
-            printf '%s=%s\n' "$key" "$value" >> "$state_file"
+            cp "$state_file" "$_tmp_state"
+            printf '%s=%s\n' "$key" "$value" >> "$_tmp_state"
+            mv "$_tmp_state" "$state_file"
         fi
     else
         printf '%s=%s\n' "$key" "$value" > "$state_file"
@@ -344,6 +350,35 @@ write_state() {
 }
 
 # ═══════════════════════════════════════════════════════════════
+# 日志轮转函数
+# ═══════════════════════════════════════════════════════════════
+# 自动清理 30 天前的日志，限制单文件最大 10MB
+# Usage: log_rotate [log_dir]
+#   默认清理 LOG_DIR 下的日志；可指定其他目录
+log_rotate() {
+    local target_dir="${1:-${LOG_DIR:-${STATE_DIR_DEFAULT}/logs}}"
+    local max_age_days=30
+    local max_size_mb=10
+
+    if [[ ! -d "$target_dir" ]]; then
+        return 0
+    fi
+
+    # 1. 清理超过 max_age_days 的日志文件
+    find "$target_dir" -name "*.log" -type f -mtime "+${max_age_days}" -exec rm -f {} \; 2>/dev/null || true
+
+    # 2. 对当前日志文件做大小轮转（>10MB 时截断保留尾部 1MB）
+    while IFS= read -r -d '' logfile; do
+        local _size
+        _size=$(wc -c < "$logfile" 2>/dev/null || echo "0")
+        if [[ "$_size" -gt $((max_size_mb * 1024 * 1024)) ]]; then
+            # 保留最后 1MB 作为备份上下文
+            tail -c $((1024 * 1024)) "$logfile" > "${logfile}.old"
+            :> "$logfile"
+        fi
+    done < <(find "$target_dir" -name "*.log" -type f -print0 2>/dev/null)
+}
+
 # 以下为调度器/CLI 扩展函数 (v0.1.0)
 # ═══════════════════════════════════════════════════════════════
 
@@ -411,58 +446,41 @@ get_active_pid() {
     return 1
 }
 
-# ── 智能抑制检测 ──────────────────────────────────────────
-
-# 屏幕锁定/休眠检测 (macOS)
-is_screen_locked() {
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        pgrep -x "loginwindow" > /dev/null 2>&1 || return 0
-        local locked
-        locked=$(python3 -c '
-import Quartz
-d = Quartz.CGSessionCopyCurrentDictionary()
-print("1" if not d or d.get("CGSSessionScreenIsLocked", False) else "0")
-' 2>/dev/null) || locked="0"
-        [[ "$locked" == "1" ]] && return 0
-    fi
-    return 1
-}
-
-# 会议模式检测 (摄像头/麦克风占用)
-is_in_meeting() {
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        # 检测摄像头占用
-        if lsof -c "VDCAssistant" 2>/dev/null | grep -q "AppleCamera"; then
-            return 0
-        fi
-        # 检测会议软件进程
-        if pgrep -i -f "zoom\|Microsoft Teams\|FaceTime\|Google Meet\|ciscowebex\|Skype" > /dev/null 2>&1; then
-            return 0
-        fi
-    fi
-    return 1
-}
-
-# 深夜静默判定 (23:00-07:00)
-is_quiet_hours() {
-    local hour
-    hour=$(date +%H | sed 's/^0//')
-    if [[ "$hour" -ge 23 || "$hour" -lt 7 ]]; then
+# ── 智能抑制检测（懒加载） ────────────────────────────────
+# 抑制检测器统一懒加载入口
+# 首次调用时 source suppression.sh，后续调用直接走真实实现
+_lazy_suppression() {
+    if [[ -n "${__LAZY_SUPPRESSION_SOURCED:-}" ]]; then
         return 0
     fi
-    return 1
+    __LAZY_SUPPRESSION_SOURCED=1
+    if [[ -f "${_LAZY_BASE}/suppression.sh" ]]; then
+        source "${_LAZY_BASE}/suppression.sh" || true
+    fi
 }
 
-# 用户空闲检测 (键盘/鼠标无输入 >5 分钟) — 仅 macOS
+# 屏幕锁定/休眠检测 (懒加载 → suppression.sh)
+is_screen_locked() {
+    _lazy_suppression
+    is_screen_locked "$@"
+}
+
+# 会议模式检测 (懒加载 → suppression.sh)
+is_in_meeting() {
+    _lazy_suppression
+    is_in_meeting "$@"
+}
+
+# 深夜静默判定 (懒加载 → suppression.sh)
+is_quiet_hours() {
+    _lazy_suppression
+    is_quiet_hours "$@"
+}
+
+# 用户空闲检测 (懒加载 → suppression.sh)
 is_user_idle() {
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        local idle_ms
-        idle_ms=$(ioreg -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/ {print int($NF/1000); exit}') || idle_ms=0
-        if [[ "$idle_ms" -gt 300000 ]]; then
-            return 0
-        fi
-    fi
-    return 1
+    _lazy_suppression
+    is_user_idle "$@"
 }
 
 # ── 简便日志函数（对 log_message 的封装） ────────────────────
@@ -508,3 +526,14 @@ current_minute() {
 # ── 版本信息 ──────────────────────────────────────────────
 readonly VITA_VERSION="0.1.0"
 readonly VITA_CODENAME="Vanilla"
+readonly VITA_SERIES="Alpha"
+
+# ── 加载用户级配置覆盖 ────────────────────────────────────
+# ~/.vitarc 可覆盖项目默认值（由 vitarc.sh 管理）
+if [[ -f "${_LAZY_BASE}/vitarc.sh" ]]; then
+    source "${_LAZY_BASE}/vitarc.sh" 2>/dev/null || true
+fi
+
+# ── 启动时自动执行日志轮转 ─────────────────────────────────
+# 每次 source common.sh 时检查一次日志目录
+log_rotate
