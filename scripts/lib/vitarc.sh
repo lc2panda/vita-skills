@@ -54,4 +54,4 @@ _load_vitarc() {
 }
 
 # 自动加载（首次 source 时执行）
-_load_vitarc
+_load_vitarc || true
