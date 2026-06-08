@@ -99,6 +99,7 @@ channels:
   terminal_echo:        true
   tts:                  false
   log_only:             true
+  wechat:               true
 
 # ═══════════════════════════════════════════════════════════════
 # 智能抑制规则 — 设计文档 §5.3

@@ -18,6 +18,99 @@ SUPPRESS_POLICY="${4:-}"    # silent | log_only | pause | degrade | bypass
 
 # ── Channel 分发函数 ──────────────────────────────────────
 
+# WeChat (iLink Bot API) 消息推送
+channel_wechat() {
+    local cred_file="$HOME/.pandacc/channels/wechat/credentials.json"
+    local token_file="$HOME/.pandacc/channels/wechat/context-tokens.json"
+
+    if [[ ! -f "$cred_file" ]]; then
+        log_info "wechat" "凭证文件不存在，跳过微信通知"
+        return 1
+    fi
+
+    MODULE="$MODULE" MESSAGE="$MESSAGE" \
+    CRED_FILE="$cred_file" TOKEN_FILE="$token_file" \
+    python3 -c "
+import json, os, sys, urllib.request, random, time
+
+# 读取凭证
+with open(os.environ['CRED_FILE']) as f:
+    cred = json.load(f)
+token = cred.get('token', '')
+base_url = cred.get('baseUrl', '')
+user_id = cred.get('userId', '')
+if not token or not base_url or not user_id:
+    sys.exit(10)
+
+# 读取 context_token
+context_token = ''
+tok_path = os.environ.get('TOKEN_FILE', '')
+if tok_path:
+    try:
+        with open(tok_path) as f:
+            tokens = json.load(f)
+            context_token = tokens.get(user_id, '')
+    except Exception:
+        pass
+
+# 组装消息
+module = os.environ['MODULE']
+message = os.environ['MESSAGE']
+wechat_msg = f'\U0001f33f [{module}] {message}'
+
+# 构建请求 body
+body = json.dumps({
+    'msg': {
+        'from_user_id': '',
+        'to_user_id': user_id,
+        'client_id': f'vita-{int(time.time())}-{random.randint(10000,99999)}',
+        'message_type': 2,
+        'message_state': 2,
+        'item_list': [{'type': 1, 'text_item': {'text': wechat_msg}}],
+        'context_token': context_token
+    },
+    'base_info': {'channel_version': '1.0.0'}
+}, ensure_ascii=False).encode('utf-8')
+
+# 构建 Headers
+headers = {
+    'Content-Type': 'application/json',
+    'AuthorizationType': 'ilink_bot_token',
+    'Authorization': f'Bearer {token}',
+    'X-WECHAT-UIN': str(random.randint(100000000, 999999999)),
+    'iLink-App-Id': 'bot',
+    'iLink-App-ClientVersion': '131081'
+}
+
+# 发送请求
+url = f'{base_url}/ilink/bot/sendmessage'
+req = urllib.request.Request(url, data=body, headers=headers, method='POST')
+try:
+    resp = urllib.request.urlopen(req, timeout=10)
+    resp_body = json.loads(resp.read().decode('utf-8'))
+    code = resp_body.get('code', resp_body.get('errcode', 0))
+    if code != 0:
+        print(json.dumps(resp_body, ensure_ascii=False))
+        sys.exit(20)
+    sys.exit(0)
+except Exception as e:
+    print(str(e))
+    sys.exit(30)
+" 2>/dev/null
+
+    local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        log_info "wechat" "微信消息发送成功"
+        return 0
+    elif [[ $rc -eq 10 ]]; then
+        log_info "wechat" "凭证缺失，跳过微信通知"
+        return 1
+    else
+        log_warn "wechat" "微信消息发送失败 (exit=$rc)"
+        return 1
+    fi
+}
+
 # macOS 桌面通知
 channel_desktop() {
     if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -140,6 +233,10 @@ dispatch() {
 
     if is_channel_enabled "tts"; then
         channel_tts && ((dispatched++)) || true
+    fi
+
+    if is_channel_enabled "wechat"; then
+        channel_wechat && ((dispatched++)) || true
     fi
 
     log_info "system" "已分发 $MODULE 提醒到 $dispatched 个 channel"
