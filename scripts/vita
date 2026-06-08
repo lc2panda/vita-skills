@@ -7,7 +7,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 解析真实脚本路径（支持软链接访问，如 ~/.pandacc/bin/vita）
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    REAL_SCRIPT="$(readlink "${BASH_SOURCE[0]}")"
+    SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/lib/common.sh"
 
 SCHEDULER="$SCRIPT_DIR/scheduler.sh"

@@ -2,7 +2,7 @@
 name: vita-health
 description: 香草健康管理 — 久坐/用眼/喝水/凯格尔锻炼智能提醒系统，集成心流自适应、多通道通知和全球打榜PK。通过后台调度守护自然嵌入工作流，无需安装独立App。
 license: MIT
-compatibility: claude-code, codex, cherry-studio, windsurf, cursor, and 40+ agent-skills platforms
+compatibility: claude-code, codex, cherry-studio, windsurf, cursor, pandacc, and 40+ agent-skills platforms
 metadata:
   version: 1.0.0
   author: 香草少校

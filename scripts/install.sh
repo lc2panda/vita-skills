@@ -308,6 +308,54 @@ SYSTEMDEOF
 
 # ── 安装完成 ──────────────────────────────────────────────
 
+# ── .pandacc 集成 ─────────────────────────────────────────
+
+setup_pandacc() {
+    echo "◆ .pandacc 集成检测"
+    echo "─────────────────────────────────────────"
+
+    local pandacc_dir="${HOME}/.pandacc"
+    if [[ ! -d "$pandacc_dir" ]]; then
+        echo "  .pandacc 目录未找到，跳过集成"
+        echo ""
+        return 0
+    fi
+
+    echo "  检测到 .pandacc 体系，自动配置集成..."
+
+    local pandacc_install="${SCRIPT_DIR}/pandacc-install.sh"
+    if [[ -f "$pandacc_install" ]]; then
+        bash "$pandacc_install"
+    else
+        echo "  警告: pandacc-install.sh 未找到，使用内联集成"
+
+        # Skills 软链接
+        local skill_link="${pandacc_dir}/skills/vita-health"
+        local repo_root; repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+        mkdir -p "${pandacc_dir}/skills"
+        if [[ ! -L "$skill_link" ]]; then
+            ln -s "$repo_root" "$skill_link"
+            echo "  技能软链接已创建: ${skill_link}"
+        else
+            echo "  技能软链接已存在"
+        fi
+
+        # bin 软链接
+        local bin_link="${pandacc_dir}/bin/vita"
+        mkdir -p "${pandacc_dir}/bin"
+        if [[ ! -L "$bin_link" ]]; then
+            ln -s "${repo_root}/scripts/vita" "$bin_link"
+            echo "  bin 软链接已创建: ${bin_link}"
+        else
+            echo "  bin 软链接已存在"
+        fi
+    fi
+
+    echo ""
+}
+
+# ── 安装完成 ──────────────────────────────────────────────
+
 print_summary() {
     echo ""
     printf "%b◆ 安装完成！%b\n" "${C_GREEN}" "${C_RESET}"
@@ -340,6 +388,7 @@ main() {
     interactive_setup
     setup_profile
     setup_autostart
+    setup_pandacc
     print_summary
 }
 
