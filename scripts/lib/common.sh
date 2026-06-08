@@ -142,7 +142,7 @@ read_config() {
         if [[ -n "$indent_key" ]]; then
             if [[ "$indent_key" == "${parts[1]}" ]]; then
                 local val
-                val="$(echo "$line" | sed -n 's/^[[:space:]]*[^:]*:[[:space:]]*//p' | sed 's/^"//;s/"$//;s/^'\''//;s/'\''$//;s/[[:space:]]*$//')"
+                val="$(echo "$line" | sed -n 's/^[[:space:]]*[^:]*:[[:space:]]*//p' | sed 's/[[:space:]]*#.*//; s/^"//; s/"$//; s/^'\''//; s/'\''$//; s/[[:space:]]*$//')"
 
                 # 空值可能是 YAML 列表的开头（key: 后无值，下一行开始是 - item）
                 if [[ -z "$val" ]]; then
@@ -300,9 +300,17 @@ read_state() {
 }
 
 write_state() {
-    local module="${1:-sedentary}"
-    local key="$2"
-    local value="$3"
+    local module key value
+    if [[ $# -eq 2 ]]; then
+        # 简化调用: write_state "key" "value" (使用默认模块)
+        module="system"
+        key="$1"
+        value="$2"
+    else
+        module="${1:-sedentary}"
+        key="$2"
+        value="$3"
+    fi
     local state_file
     state_file="$(get_state_file "$module")"
 
