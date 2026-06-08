@@ -196,37 +196,28 @@ vita test      # 发送测试通知验证各模块
    wrangler login
    ```
 
-#### 步骤 1：创建 D1 数据库
+#### 已配置的数据库
+| 资源 | ID |
+|------|-----|
+| D1 Database | `bb7d4268-af7c-4cbc-9b2d-23fa8cefd848` |
+| 数据库名 | `vita-leaderboard-db` |
+
+#### 数据库初始化（远程）
 ```bash
 cd leaderboard
 npm install
-npx wrangler d1 create vita-leaderboard-db
-```
-执行后会输出 database_id，记录此值。
-
-#### 步骤 2：配置 wrangler.toml
-将输出的 database_id 填入 `leaderboard/wrangler.toml`：
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "vita-leaderboard-db"
-database_id = "<填入你的 database_id>"
+npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/001_init.sql --remote
+npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/002_indexes.sql --remote
+npx wrangler d1 execute vita-leaderboard-db --file=db/seed.sql --remote
 ```
 
-#### 步骤 3：初始化数据库
-```bash
-npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/001_init.sql
-npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/002_indexes.sql
-npx wrangler d1 execute vita-leaderboard-db --file=db/seed.sql
-```
-
-#### 步骤 4：本地开发测试
+#### 本地开发
 ```bash
 npx wrangler dev
 ```
 访问 http://localhost:8787
 
-#### 步骤 5：部署到生产
+#### 步骤 2：部署到生产
 ```bash
 npx wrangler deploy
 ```
