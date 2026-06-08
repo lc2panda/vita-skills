@@ -40,7 +40,7 @@ allowed-tools: bash, read, write
 ### 4. 凯格尔训练 — `kegel.sh`
 - **默认频率**：每日 3 次
 - **科学依据**：Cochrane 2024 系统综述（63 RCT/4,920 人），PFMT 为尿失禁一线推荐疗法 (RR=8.38)；Cleveland Clinic + NIH/NIDDK 临床指导
-- **训练方案**：四阶段进阶——初学者（3s 保持）→ 过渡期（5s）→ 标准期（8s）→ 巩固期（10s）
+- **训练方案**：两阶段进阶——初学者（2组/天，10次/组，保持3-5s）→ 进阶（3组/天，15次/组，保持5-10s），config 预留 transition/standard 四阶段扩展位
 - **隐私保护**：默认启用 `privacy_mode`，使用含蓄文案保护用户隐私
 - **支持男女两性**：gender-aware 差异化指导
 
@@ -61,17 +61,17 @@ allowed-tools: bash, read, write
 ### 自适应引擎 — `scripts/adaptive-engine.sh`
 - **评分系统**：0-100 忠诚度评分，初始 50
 - **响应驱动**：完成 +10 / 忽略 -5 / 延迟 -3
-- **频率调节**：
-  - 0-30（需关注）→ 1.5x 加速提醒
-  - 30-60（标准）→ 1.0x 正常频率
-  - 60-80（良好）→ 0.8x 适度放宽
-  - 80-100（优秀）→ 0.6x 低频提醒
-- **段位系统**：钻石 (80+) / 黄金 (60-79) / 白银 (30-59) / 青铜 (0-29)
+- **频率调节**（基于 config/default.yaml multipliers）：
+  - 0-29 → 1.5x 加速提醒
+  - 30-59 → 1.0x 正常频率
+  - 60-79 → 0.8x 适度放宽
+  - 80-100 → 0.6x 低频提醒
+- **五级段位**（代码实现）：iron (0-29) / bronze (30-59) / silver (60-79) / gold (80-94) / diamond (95-100)
 
 ### 多通道通知 — `scripts/channel-adapter.sh`
 按优先级分发：桌面弹窗 → 终端回显 → TTS 语音 → 静默日志。当桌面环境不可用时自动降级至 log_only 安全模式。
 
-### 智能抑制 — `scripts/lib/common.sh`
+### 智能抑制 — `scripts/lib/suppression.sh`（由 common.sh 懒加载）
 - 安静时段 (23:00-07:00) → 仅日志
 - 会议中（摄像头使用）→ 静默
 - 锁屏 → 暂停
@@ -96,7 +96,7 @@ vita start
 
 ### 配置文件
 
-默认配置：`config/default.yaml`（126 行，涵盖四大模块/打榜/守护/心流/通道/抑制/自适应全部参数）
+默认配置：`config/default.yaml`（128 行，涵盖四大模块/打榜/守护/心流/通道/抑制/自适应全部参数）
 用户配置：`~/.vita/config/config.yaml`（安装向导自动生成）
 Schema 校验：`config/schema.yaml`（JSON Schema Draft-07）
 
