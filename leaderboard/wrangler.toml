@@ -1,0 +1,15 @@
+name = "vita-leaderboard"
+main = "src/index.ts"
+compatibility_date = "2025-06-08"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vita-leaderboard-db"
+database_id = "vita-leaderboard-db"
+
+[site]
+bucket = "./src/frontend"
+
+[[kv_namespaces]]
+binding = "KV_CACHE"
+id = "vita-cache"
