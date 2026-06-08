@@ -132,19 +132,16 @@ vita config edit
 - **详见**：`leaderboard/API.md`、`leaderboard/README.md`
 
 ### 客户端 — `scripts/lib/leaderboard-client.sh`
-处理 API 调用、签名生成、离线队列和自动重试。由 `kegel.sh` 和 `install.sh` 集成调用。用户昵称由 `scripts/lib/nickname-validator.sh` 校验。
+处理 API 调用、签名生成、离线队列和自动重试。由 `kegel.sh` 和 `install.sh` 集成调用。
 
 ## 共享库 — `scripts/lib/`
 
 | 文件 | 职责 |
 |------|------|
 | `common.sh` | 公共工具（日志/配置/通知/心流检测/状态管理） |
-| `flow-detector.sh` | 心流判定逻辑 |
-| `channel-adapter.sh` | 多通道分发逻辑 |
-| `adaptive-engine.sh` | 自适应评分引擎 |
 | `leaderboard-client.sh` | 打榜 API 客户端 |
-| `name-validator.sh` | 名称合法性校验 |
-| `nickname-validator.sh` | 昵称格式与敏感词校验 |
+
+其余脚本（flow-detector、channel-adapter、adaptive-engine）的权威实现已合并到 `scripts/` 顶层目录。
 
 ## 测试
 

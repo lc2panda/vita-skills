@@ -39,12 +39,8 @@ vita-skills/
 │   ├── adaptive-engine.sh              # 自适应忠诚度引擎
 │   └── lib/                            # 共享库
 │       ├── common.sh                   # 公共工具库（日志/配置/通知/抑制）
-│       ├── flow-detector.sh            # 心流检测逻辑
-│       ├── channel-adapter.sh          # 通道适配逻辑
-│       ├── adaptive-engine.sh          # 自适应引擎逻辑
 │       ├── leaderboard-client.sh       # 打榜 API 客户端
-│       ├── name-validator.sh           # 名称校验
-│       └── nickname-validator.sh       # 昵称校验
+│       └── vitarc.sh                   # 配置编辑器
 ├── config/                             # 配置层
 │   ├── default.yaml                    # 默认配置模板（四大模块 + 打榜 + 抑制 + 心流 + 自适应）
 │   ├── schema.yaml                     # JSON Schema Draft-07 配置校验
