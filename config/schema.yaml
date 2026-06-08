@@ -1,0 +1,189 @@
+# Input:  config/default.yaml 的字段结构
+# Output: JSON Schema Draft-07 配置校验文件，用于验证用户配置合法性
+# Pos:    config/schema.yaml — 配置格式约束定义，供 config-parser 加载时校验
+#
+# 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "香草健康管理配置"
+description: "vita-skills 配置文件 Schema 定义"
+type: object
+properties:
+  health-sedentary:
+    type: object
+    description: "久坐提醒模块"
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      interval_minutes:
+        type: integer
+        minimum: 25
+        maximum: 60
+        multipleOf: 5
+        default: 30
+      min_break_seconds:
+        type: integer
+        minimum: 60
+        maximum: 600
+        default: 120
+      hard_limit_minutes:
+        type: integer
+        minimum: 60
+        maximum: 240
+        default: 120
+      daily_stand_target_minutes:
+        type: integer
+        default: 120
+      do_not_disturb:
+        type: array
+        items:
+          type: string
+          pattern: '^\d{2}:\d{2}-\d{2}:\d{2}$'
+        default: []
+      message_level:
+        type: string
+        enum: [signal, spark, facilitator]
+        default: "spark"
+    required: [enabled, interval_minutes, min_break_seconds]
+
+  health-eye-care:
+    type: object
+    description: "用眼提醒模块"
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      interval_minutes:
+        type: integer
+        enum: [25, 45, 50, 90]
+        default: 50
+      break_seconds:
+        type: integer
+        enum: [30, 60, 90]
+        default: 60
+      view_distance_m:
+        type: integer
+        minimum: 1
+        default: 6
+      blink_count:
+        type: integer
+        minimum: 5
+        maximum: 30
+        default: 15
+      do_not_disturb:
+        type: array
+        items:
+          type: string
+          pattern: '^\d{2}:\d{2}-\d{2}:\d{2}$'
+        default: []
+    required: [enabled, interval_minutes, break_seconds]
+
+  health-hydration:
+    type: object
+    description: "喝水提醒模块"
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      interval_minutes:
+        type: integer
+        minimum: 60
+        maximum: 90
+        default: 75
+      target_per_drink_ml:
+        type: integer
+        minimum: 150
+        maximum: 250
+        default: 200
+      daily_target_ml:
+        type: integer
+        minimum: 500
+        maximum: 5000
+        default: 2000
+      start_time:
+        type: string
+        pattern: '^\d{2}:\d{2}$'
+        default: "09:00"
+      end_time:
+        type: string
+        pattern: '^\d{2}:\d{2}$'
+        default: "18:00"
+      do_not_disturb:
+        type: array
+        items:
+          type: string
+          pattern: '^\d{2}:\d{2}-\d{2}:\d{2}$'
+        default: []
+    required: [enabled, interval_minutes, target_per_drink_ml]
+
+  health-kegel:
+    type: object
+    description: "提肛锻炼提醒模块"
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      reminders_per_day:
+        type: integer
+        minimum: 2
+        maximum: 4
+        default: 3
+      stage:
+        type: string
+        enum: [beginner, transition, standard, advanced]
+        default: "beginner"
+      sets_per_session:
+        type: integer
+        minimum: 1
+        maximum: 5
+        default: 3
+      reps_per_set:
+        type: integer
+        minimum: 5
+        maximum: 15
+        default: 10
+      hold_seconds:
+        type: integer
+        minimum: 3
+        maximum: 10
+        default: 3
+      rest_seconds:
+        type: integer
+        minimum: 3
+        maximum: 10
+        default: 3
+      privacy_mode:
+        type: boolean
+        default: true
+      do_not_disturb:
+        type: array
+        items:
+          type: string
+          pattern: '^\d{2}:\d{2}-\d{2}:\d{2}$'
+        default:
+          - "22:00-07:00"
+    required: [enabled, reminders_per_day, stage]
+
+  health-leaderboard:
+    type: object
+    description: "打榜PK系统"
+    properties:
+      enabled:
+        type: boolean
+        default: false
+      opt_in_leaderboard:
+        type: boolean
+        default: false
+      display_name:
+        type: string
+        minLength: 1
+        maxLength: 20
+        default: "匿名战士"
+      api_base_url:
+        type: string
+        format: uri
+        default: "https://api.vanilla-health.dev"
+    required: [enabled]
+
+additionalProperties: false
