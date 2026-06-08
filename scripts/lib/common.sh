@@ -290,12 +290,25 @@ is_dnd() {
 
 # ── 读取/写入状态文件（key=value 格式） ──────────────────────
 read_state() {
-    local module="${1:-sedentary}"
-    local key="$2"
+    local module key default
+    if [[ $# -eq 2 ]]; then
+        # 简化调用: read_state "key" "default_value"
+        module="system"
+        key="$1"
+        default="${2:-}"
+    else
+        module="${1:-sedentary}"
+        key="$2"
+        default="${3:-}"
+    fi
     local state_file
     state_file="$(get_state_file "$module")"
     if [[ -f "$state_file" ]]; then
-        grep "^${key}=" "$state_file" 2>/dev/null | cut -d= -f2- || echo ""
+        local val
+        val=$(grep "^${key}=" "$state_file" 2>/dev/null | cut -d= -f2-)
+        echo "${val:-$default}"
+    else
+        echo "$default"
     fi
 }
 

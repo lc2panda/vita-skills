@@ -1,0 +1,363 @@
+#!/usr/bin/env bash
+# Input:  命令行参数 — vita <命令> [参数]
+# Output: 执行相应子命令 (start/stop/status/config/log/test/setup/leaderboard/version)
+# Pos:    scripts/vita — CLI 入口，用户与 vita 系统的唯一交互界面
+
+# 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
+SCHEDULER="$SCRIPT_DIR/scheduler.sh"
+ADAPTIVE_ENGINE="$SCRIPT_DIR/adaptive-engine.sh"
+INSTALL_SCRIPT="$SCRIPT_DIR/install.sh"
+
+VITA_CMD="${1:-}"
+
+# ── 颜色便利函数 ─────────────────────────────────────────
+_green()  { printf "%b" "${C_GREEN:-}"; }
+_red()    { printf "%b" "${C_RED:-}"; }
+_cyan()   { printf "%b" "${C_CYAN:-}"; }
+_yellow() { printf "%b" "${C_YELLOW:-}"; }
+_bold()   { printf "%b" "${C_BOLD:-}"; }
+_reset()  { printf "%b" "${C_RESET:-}"; }
+
+# ── 从 read_config 返回值中剔除行内注释 ──────────────────
+_strip_comment() {
+    sed 's/[[:space:]]*#.*$//' | sed 's/[[:space:]]*$//'
+}
+
+cfg() {
+    read_config "$1" "${2:-}" | _strip_comment
+}
+
+# ── 使用说明 ─────────────────────────────────────────────
+
+usage() {
+    echo "Vita 健康守护 v${VITA_VERSION} (${VITA_CODENAME})"
+    echo ""
+    echo "用法: vita <命令> [参数]"
+    echo ""
+    echo "命令:"
+    echo "  start          启动健康守护（后台运行）"
+    echo "  stop           停止守护"
+    echo "  status         查看状态（运行模块、今日统计、忠诚度评分）"
+    echo "  config         查看当前配置"
+    echo "  log            查看近期提醒日志"
+    echo "  test           测试所有 reminder 模块（发送测试通知）"
+    echo "  setup          首次安装向导"
+    echo "  leaderboard    查看打榜排名"
+    echo "  version        版本信息"
+    echo ""
+    echo "示例:"
+    echo "  vita start      # 启动守护"
+    echo "  vita status     # 查看状态"
+    echo "  vita test       # 测试提醒"
+}
+
+# ── start ─────────────────────────────────────────────────
+
+cmd_start() {
+    log_message "INFO" "vita" "正在启动 Vita 守护进程..."
+
+    _ensure_dir "$STATE_DIR_DEFAULT"
+    _ensure_dir "$LOG_DIR_DEFAULT"
+
+    local pid
+    if pid=$(get_active_pid); then
+        log_message "INFO" "vita" "已在运行 (PID: $pid)"
+        echo "vita 已在运行中，PID: $pid"
+        return 0
+    fi
+
+    nohup bash "$SCHEDULER" daemon \
+        >> "$LOG_DIR_DEFAULT/scheduler.log" 2>&1 &
+
+    local new_pid=$!
+    sleep 1
+
+    if kill -0 "$new_pid" 2>/dev/null; then
+        log_message "INFO" "vita" "守护进程已启动 (PID: $new_pid)"
+        echo "Vita 守护进程已启动，PID: $new_pid"
+    else
+        log_message "ERROR" "vita" "启动失败"
+        echo "启动失败，请查看日志: $LOG_DIR_DEFAULT/scheduler.log"
+        return 1
+    fi
+}
+
+# ── stop ──────────────────────────────────────────────────
+
+cmd_stop() {
+    log_message "INFO" "vita" "正在停止守护进程..."
+
+    local pid
+    if ! pid=$(get_active_pid); then
+        echo "Vita 未在运行"
+        return 0
+    fi
+
+    kill -TERM "$pid" 2>/dev/null || true
+
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && [[ "$waited" -lt 10 ]]; do
+        sleep 1
+        ((waited++))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        log_message "WARN" "vita" "强制终止 (PID: $pid)"
+        kill -9 "$pid" 2>/dev/null || true
+    fi
+
+    release_lock
+    rm -f "$STATE_DIR_DEFAULT/scheduler_running"
+
+    echo "Vita 已停止"
+}
+
+# ── status ────────────────────────────────────────────────
+
+cmd_status() {
+    echo ""
+    printf "%bVita 健康守护 v%s (%s)%b\n" "$(_bold)$(_cyan)" "$VITA_VERSION" "$VITA_CODENAME" "$(_reset)"
+    echo "─────────────────────────────────────────"
+
+    local pid
+    if pid=$(get_active_pid); then
+        printf "运行状态: %b运行中%b (PID: %s)\n" "$(_green)" "$(_reset)" "$pid"
+    else
+        printf "运行状态: %b已停止%b\n" "$(_red)" "$(_reset)"
+    fi
+
+    echo ""
+    echo "模块状态:"
+    for module in sedentary eye-care hydration kegel; do
+        local label
+        case "$module" in
+            sedentary) label="久坐提醒";;
+            eye-care)  label="护眼提醒";;
+            hydration) label="喝水提醒";;
+            kegel)     label="凯格尔训练";;
+        esac
+
+        local enabled
+        enabled=$(cfg "health-${module}.enabled" "true")
+        if [[ "$enabled" == "true" ]]; then
+            printf "  %b✓%b %s" "$(_green)" "$(_reset)" "$label"
+            if [[ "$module" == "kegel" ]]; then
+                echo "  (固定时间: 09:00, 14:00, 20:00)"
+            else
+                local interval
+                interval=$(cfg "health-${module}.interval_minutes" "30")
+                echo "  (每 ${interval} 分钟)"
+            fi
+        else
+            printf "  %b✗%b %s (已禁用)\n" "$(_red)" "$(_reset)" "$label"
+        fi
+    done
+
+    echo ""
+    echo "今日统计 ($(date '+%Y-%m-%d')):"
+    local stats
+    stats=$(bash "$ADAPTIVE_ENGINE" status 2>/dev/null) || stats="暂无数据"
+    echo "  $stats"
+
+    echo ""
+    echo "忠诚度评分:"
+    local score_info
+    score_info=$(bash "$ADAPTIVE_ENGINE" 2>/dev/null) || score_info=""
+    local score tier
+    score=$(echo "$score_info" | awk -F'=' '/^score=/ {print $2; exit}')
+    tier=$( echo "$score_info" | awk -F'=' '/^tier=/  {print $2; exit}')
+
+    if [[ -n "${score:-}" ]]; then
+        local tier_icon tier_color
+        case "${tier:-}" in
+            diamond) tier_icon="◆"; tier_color="$C_CYAN";;
+            gold)    tier_icon="●"; tier_color="$C_YELLOW";;
+            silver)  tier_icon="◈"; tier_color="$C_WHITE";;
+            bronze)  tier_icon="◉"; tier_color="$C_MAGENTA";;
+            *)       tier_icon="○"; tier_color="$C_DIM";;
+        esac
+        printf "  %s 评分: %s  %b%s%b\n" \
+            "$tier_icon" "$score" "$tier_color" "$(echo "${tier:-unknown}" | tr 'a-z' 'A-Z')" "$(_reset)"
+    else
+        echo "  暂无数据"
+    fi
+    echo ""
+}
+
+# ── config ────────────────────────────────────────────────
+
+cmd_config() {
+    local config_file="${VITA_CONFIG_FILE:-$CONFIG_DIR_DEFAULT/config.yaml}"
+
+    if [[ ! -f "$config_file" ]]; then
+        echo "配置文件不存在。运行 'vita setup' 创建配置。"
+        return 1
+    fi
+
+    local subcmd="${1:-view}"
+    case "$subcmd" in
+        view|"")
+            echo "配置文件: $config_file"
+            echo "─────────────────────────────────────────"
+            cat "$config_file"
+            ;;
+        edit)
+            "${EDITOR:-vi}" "$config_file"
+            ;;
+        path)
+            echo "$config_file"
+            ;;
+        *)
+            echo "用法: vita config [view|edit|path]"
+            ;;
+    esac
+}
+
+# ── log ───────────────────────────────────────────────────
+
+cmd_log() {
+    local lines="${1:-50}"
+    local log_file="$LOG_DIR_DEFAULT/scheduler.log"
+
+    if [[ ! -f "$log_file" ]]; then
+        echo "日志文件尚未创建"
+        return 0
+    fi
+
+    echo "最近 ${lines} 条日志 ($log_file)"
+    echo "─────────────────────────────────────────"
+    tail -n "$lines" "$log_file"
+}
+
+# ── test ──────────────────────────────────────────────────
+
+cmd_test() {
+    echo "Vita 测试模式 — 发送所有提醒模块的测试通知"
+    echo "─────────────────────────────────────────"
+    echo ""
+
+    local entries=(
+        "久坐提醒|起来动动吧！(测试消息)"
+        "护眼提醒|看看远处休息一下！(测试消息)"
+        "喝水提醒|喝杯水！(测试消息)"
+        "凯格尔训练|盆底肌训练时间！(测试消息)"
+    )
+
+    for entry in "${entries[@]}"; do
+        local label="${entry%%|*}"
+        local msg="${entry#*|}"
+
+        echo "触发: $label..."
+        bash "$SCRIPT_DIR/channel-adapter.sh" "$label" "$msg" "normal" "" 2>/dev/null || true
+        echo "  已发送"
+        sleep 1
+    done
+
+    echo ""
+    echo "所有模块测试通知已发送"
+}
+
+# ── setup ─────────────────────────────────────────────────
+
+cmd_setup() {
+    echo ""
+    printf "%b◆ Vita 首次安装向导%b\n" "$(_bold)$(_cyan)" "$(_reset)"
+    echo "─────────────────────────────────────────"
+    echo ""
+
+    if [[ -f "$CONFIG_DIR_DEFAULT/config.yaml" ]]; then
+        echo "检测到已有配置: $CONFIG_DIR_DEFAULT/config.yaml"
+        echo ""
+        read -r -p "是否重新运行安装？[y/N] " confirm
+        if [[ ! "$confirm" =~ ^[Yy] ]]; then
+            echo "已取消"
+            return 0
+        fi
+    fi
+
+    bash "$INSTALL_SCRIPT" interactive
+}
+
+# ── leaderboard ───────────────────────────────────────────
+
+cmd_leaderboard() {
+    echo ""
+    printf "%b◆ 打榜排名%b\n" "$(_bold)$(_yellow)" "$(_reset)"
+    echo "─────────────────────────────────────────"
+
+    local nickname
+    nickname=$(cfg "global.nickname" "")
+    if [[ -z "$nickname" ]]; then
+        echo "尚未设置打榜昵称。运行 'vita setup' 设置。"
+    else
+        echo "打榜昵称: $nickname"
+    fi
+
+    local date_key
+    date_key=$(date '+%Y%m%d')
+    echo ""
+    echo "今日统计 ($(date '+%Y-%m-%d')):"
+
+    local total_completed=0
+    for module in sedentary eye-care hydration; do
+        local completed
+        completed=$(read_state "stats_${date_key}_completed" "0")
+        total_completed=$(( total_completed + completed ))
+    done
+
+    local kegel_count=0
+    for t in "0900" "1400" "2000"; do
+        local triggered
+        triggered=$(read_state "kegel_${date_key}_${t}" "0")
+        [[ "$triggered" == "1" ]] && ((kegel_count++)) || true
+    done
+
+    echo "  完成提醒: ${total_completed} 次"
+    echo "  凯格尔:   ${kegel_count}/3 次"
+    echo ""
+
+    local streak
+    streak=$(read_state "leaderboard_streak" "0")
+    echo "连续打卡: ${streak} 天"
+    echo ""
+    echo "完整打榜功能将在 v0.2.0 开放。"
+}
+
+# ── version ───────────────────────────────────────────────
+
+cmd_version() {
+    echo "Vita 健康守护 v${VITA_VERSION} (${VITA_CODENAME})"
+    echo "Built with Bash."
+}
+
+# ── 主分发 ───────────────────────────────────────────────
+
+if [[ -z "$VITA_CMD" ]]; then
+    usage
+    exit 1
+fi
+
+case "$VITA_CMD" in
+    start)        cmd_start ;;
+    stop)         cmd_stop ;;
+    status)       cmd_status ;;
+    config)       shift 2>/dev/null || true; cmd_config "$@" ;;
+    log)          shift 2>/dev/null || true; cmd_log "$@" ;;
+    test)         cmd_test ;;
+    setup)        cmd_setup ;;
+    leaderboard)  cmd_leaderboard ;;
+    version|--version|-v|-V) cmd_version ;;
+    help|--help|-h) usage ;;
+    *)
+        echo "未知命令: $VITA_CMD"
+        echo ""
+        usage
+        exit 1
+        ;;
+esac
