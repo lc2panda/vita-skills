@@ -12,31 +12,31 @@
 -- 系统级成就占位，后续由 Worker 根据用户行为动态授予
 -- badge_type 枚举: streak_3, streak_7, streak_30, early_bird, night_owl,
 --                  power_user, pk_winner, first_checkin, record_breaker
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'first_checkin', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'streak_3', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'streak_7', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'streak_30', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'early_bird', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'night_owl', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'power_user', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'pk_winner', unixepoch());
 
-INSERT OR IGNORE INTO achievements (user_id, badge_type, awarded_at)
+INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'record_breaker', unixepoch());
 
 -- ============================================
