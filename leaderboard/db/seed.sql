@@ -4,19 +4,21 @@
 -- Pos:   leaderboard/db/seed.sql — 种子数据，Phase 3 打榜系统初始化
 --
 -- 香草健康管理 打榜 PK 系统 — D1 种子数据
--- 创建时间: 2026-06-08 16:00:00 +08:00 (Asia/Singapore)
+-- 更新时间: 2026-06-08 18:00:00 +08:00 (Asia/Singapore)
+
+-- ============================================
+-- 系统占位用户（成就徽章定义需要外键引用）
+-- ============================================
+INSERT OR IGNORE INTO users (id, display_name, device_id)
+VALUES ('system', 'System', 'system');
 
 -- ============================================
 -- 预置成就徽章定义
 -- ============================================
--- 系统级成就占位，后续由 Worker 根据用户行为动态授予
--- badge_type 枚举: streak_3, streak_7, streak_30, early_bird, night_owl,
---                  power_user, pk_winner, first_checkin, record_breaker
+-- 徽章类型与 src/types.ts BADGE_DEFINITIONS 完全对齐
+-- 后续由 Worker 根据用户行为动态授予
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'first_checkin', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'streak_3', unixepoch());
 
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'streak_7', unixepoch());
@@ -25,23 +27,19 @@ INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
 VALUES ('system', 'streak_30', unixepoch());
 
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'early_bird', unixepoch());
+VALUES ('system', 'streak_100', unixepoch());
 
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'night_owl', unixepoch());
+VALUES ('system', 'perfect_sets_10', unixepoch());
 
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'power_user', unixepoch());
+VALUES ('system', 'score_100', unixepoch());
 
 INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'pk_winner', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'record_breaker', unixepoch());
+VALUES ('system', 'score_500', unixepoch());
 
 -- ============================================
 -- 每日统计基线记录
 -- ============================================
--- 哨兵记录，确保 daily_stats 不为空，供定时 Worker 聚合时作为基线
 INSERT OR IGNORE INTO daily_stats (date, total_checkins, active_users, avg_sets, top_user_id, top_score)
 VALUES ('1970-01-01', 0, 0, 0.0, 'system', 0);
