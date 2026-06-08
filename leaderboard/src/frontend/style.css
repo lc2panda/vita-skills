@@ -1,0 +1,561 @@
+/**
+ * Input:  无外部依赖，纯 CSS
+ * Output: 排行榜页面样式 — 绿色主题、斑马纹表格、等级徽章、排名动画、暗色模式
+ * Pos:    Cloudflare Pages 前端样式表
+ * 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
+ */
+
+/* ================================================================
+   CSS 变量定义
+   ================================================================ */
+
+:root {
+  /* 主色调 — 绿色主题 */
+  --color-primary: #10B981;
+  --color-primary-dark: #059669;
+  --color-primary-light: #D1FAE5;
+  --color-primary-bg: #ECFDF5;
+
+  /* 中性色 */
+  --color-bg: #F9FAFB;
+  --color-surface: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-text: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+
+  /* 排名颜色 */
+  --color-gold: #F59E0B;
+  --color-silver: #94A3B8;
+  --color-bronze: #D97706;
+
+  /* 徽章颜色 */
+  --color-badge-grey: #9CA3AF;
+  --color-badge-blue: #3B82F6;
+  --color-badge-gold: #F59E0B;
+
+  /* 高亮 */
+  --color-highlight-bg: rgba(16, 185, 129, 0.08);
+  --color-highlight-border: #10B981;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono",
+    "Courier New", monospace;
+}
+
+/* ================================================================
+   暗色模式
+   ================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #34D399;
+    --color-primary-dark: #10B981;
+    --color-primary-light: #064E3B;
+    --color-primary-bg: #022C22;
+
+    --color-bg: #0F172A;
+    --color-surface: #1E293B;
+    --color-border: #334155;
+    --color-text: #F1F5F9;
+    --color-text-secondary: #94A3B8;
+    --color-text-muted: #64748B;
+
+    --color-gold: #FBBF24;
+    --color-silver: #94A3B8;
+    --color-bronze: #F59E0B;
+
+    --color-highlight-bg: rgba(52, 211, 153, 0.12);
+    --color-highlight-border: #34D399;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ================================================================
+   全局重置
+   ================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ================================================================
+   容器与布局
+   ================================================================ */
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+/* ================================================================
+   头部
+   ================================================================ */
+
+.header {
+  text-align: center;
+  padding: 32px 0 24px;
+}
+
+.title {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+/* ================================================================
+   标签导航
+   ================================================================ */
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+
+.tab {
+  flex: 1;
+  max-width: 120px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+.tab:hover {
+  color: var(--color-text);
+  background: var(--color-primary-bg);
+}
+
+.tab.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ================================================================
+   表格容器
+   ================================================================ */
+
+.table-wrapper {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+/* ================================================================
+   表格
+   ================================================================ */
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.leaderboard-table thead {
+  background: var(--color-primary-bg);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.leaderboard-table th {
+  padding: 14px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.leaderboard-table td {
+  padding: 14px 12px;
+  text-align: center;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 列宽分配 */
+.col-rank { width: 12%; }
+.col-name { width: 28%; }
+.col-score { width: 18%; }
+.col-streak { width: 18%; }
+.col-level { width: 24%; }
+
+/* ================================================================
+   斑马纹
+   ================================================================ */
+
+.leaderboard-table tbody tr:nth-child(even) {
+  background: var(--color-bg);
+}
+
+.leaderboard-table tbody tr:nth-child(odd) {
+  background: var(--color-surface);
+}
+
+.leaderboard-table tbody tr:hover {
+  background: var(--color-primary-bg);
+}
+
+/* ================================================================
+   排名数字
+   ================================================================ */
+
+.rank-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+}
+
+.rank-top-1 {
+  background: var(--color-gold);
+  color: #FFFFFF;
+}
+
+.rank-top-2 {
+  background: var(--color-silver);
+  color: #FFFFFF;
+}
+
+.rank-top-3 {
+  background: var(--color-bronze);
+  color: #FFFFFF;
+}
+
+/* ================================================================
+   昵称列
+   ================================================================ */
+
+.col-name {
+  text-align: left;
+  padding-left: 16px;
+  font-weight: 500;
+}
+
+.row-private .col-name {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ================================================================
+   当前用户高亮
+   ================================================================ */
+
+.row-highlight {
+  background: var(--color-highlight-bg) !important;
+  border-left: 3px solid var(--color-highlight-border);
+}
+
+.row-highlight td:first-child {
+  padding-left: 9px; /* 补偿 border-left 宽度 */
+}
+
+/* ================================================================
+   等级徽章
+   ================================================================ */
+
+.badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+/* 灰 — beginner */
+.badge-grey {
+  background: #F3F4F6;
+  color: #6B7280;
+  border: 1px solid #D1D5DB;
+}
+
+/* 蓝 — intermediate */
+.badge-blue {
+  background: #DBEAFE;
+  color: #1D4ED8;
+  border: 1px solid #93C5FD;
+}
+
+/* 金 — advanced / platinum / diamond / master */
+.badge-gold {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+/* 暗色模式下的徽章适配 */
+@media (prefers-color-scheme: dark) {
+  .badge-grey {
+    background: #374151;
+    color: #D1D5DB;
+    border-color: #4B5563;
+  }
+
+  .badge-blue {
+    background: #1E3A5F;
+    color: #93C5FD;
+    border-color: #2563EB;
+  }
+
+  .badge-gold {
+    background: #422006;
+    color: #FDE68A;
+    border-color: #D97706;
+  }
+}
+
+/* ================================================================
+   加载与空状态
+   ================================================================ */
+
+.loading-cell,
+.empty-cell {
+  padding: 48px 16px !important;
+  text-align: center !important;
+  color: var(--color-text-muted);
+}
+
+.loading-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ================================================================
+   错误消息
+   ================================================================ */
+
+.error-message {
+  margin-top: 16px;
+  padding: 14px 20px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: var(--radius-md);
+  color: #B91C1C;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.error-message.hidden {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .error-message {
+    background: #3B0A0A;
+    border-color: #7F1D1D;
+    color: #FCA5A5;
+  }
+}
+
+/* ================================================================
+   页脚
+   ================================================================ */
+
+.footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.refresh-countdown {
+  font-family: var(--font-mono);
+}
+
+/* ================================================================
+   排名上升闪烁动画
+   ================================================================ */
+
+@keyframes rankUpFlash {
+  0% {
+    background: var(--color-primary-light);
+    transform: scale(1);
+  }
+  25% {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    transform: scale(1.01);
+  }
+  50% {
+    background: var(--color-primary-light);
+    transform: scale(1);
+  }
+  75% {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    transform: scale(1.01);
+  }
+  100% {
+    background: transparent;
+    transform: scale(1);
+  }
+}
+
+.rank-up-flash {
+  animation: rankUpFlash 0.8s ease-in-out;
+}
+
+/* ================================================================
+   旋转动画
+   ================================================================ */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ================================================================
+   移动端响应式
+   ================================================================ */
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px 8px 32px;
+  }
+
+  .header {
+    padding: 20px 0 16px;
+  }
+
+  .title {
+    font-size: 1.15rem;
+  }
+
+  .tabs {
+    margin-bottom: 16px;
+    padding: 3px;
+  }
+
+  .tab {
+    padding: 8px 10px;
+    font-size: 0.82rem;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 10px 6px;
+    font-size: 0.8rem;
+  }
+
+  .leaderboard-table th {
+    font-size: 0.7rem;
+  }
+
+  .col-name {
+    padding-left: 8px;
+  }
+
+  .rank-num {
+    width: 26px;
+    height: 26px;
+    font-size: 0.78rem;
+  }
+
+  .badge {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 400px) {
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 8px 4px;
+    font-size: 0.72rem;
+  }
+
+  .col-rank { width: 10%; }
+  .col-name { width: 30%; }
+  .col-score { width: 16%; }
+  .col-streak { width: 18%; }
+  .col-level { width: 26%; }
+
+  .badge {
+    padding: 1px 6px;
+    font-size: 0.65rem;
+  }
+}

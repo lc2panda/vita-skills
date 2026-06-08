@@ -52,6 +52,7 @@ health-kegel:
   hold_seconds: 3                # 保持秒数，可调范围 3-10
   rest_seconds: 3                # 休息秒数，保持/休息比 1:1
   privacy_mode: true             # 隐私模式：含蓄文案
+  leaderboard_enabled: false     # 是否参与打榜，init 时询问
   do_not_disturb:                # 免打扰时段
     - "22:00-07:00"
 

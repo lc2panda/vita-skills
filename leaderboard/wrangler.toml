@@ -6,6 +6,7 @@ compatibility_date = "2025-06-08"
 binding = "DB"
 database_name = "vita-leaderboard-db"
 database_id = "vita-leaderboard-db"
+migrations_dir = "db/migrations"
 
 [site]
 bucket = "./src/frontend"

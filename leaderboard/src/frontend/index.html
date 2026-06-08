@@ -1,0 +1,64 @@
+<!--
+  Input: URL query param ?user=xxx for current user highlight
+  Output: 排行榜单页应用 — 周榜/月榜/总榜切换 + 排名表格
+  Pos: Cloudflare Pages 静态站点入口，面向最终用户
+  一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="香草健康管理 — 提肛锻炼排行榜">
+  <title>香草健康管理 — 排行榜</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">香草健康管理 — 提肛锻炼排行榜</h1>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-type="weekly">周榜</button>
+      <button class="tab" data-type="monthly">月榜</button>
+      <button class="tab" data-type="total">总榜</button>
+    </nav>
+
+    <main class="main">
+      <div class="table-wrapper">
+        <table class="leaderboard-table" id="leaderboard-table">
+          <thead>
+            <tr>
+              <th class="col-rank">排名</th>
+              <th class="col-name">昵称</th>
+              <th class="col-score">分数</th>
+              <th class="col-streak">连续天数</th>
+              <th class="col-level">等级</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr class="row-loading">
+              <td colspan="5" class="loading-cell">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="error-message hidden" id="error-message">
+        <p>数据加载失败，请稍后重试。</p>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span class="refresh-hint">数据每 60 秒自动刷新</span>
+      <span class="refresh-countdown" id="refresh-countdown">下次刷新: 60s</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

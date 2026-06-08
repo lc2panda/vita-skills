@@ -9,6 +9,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ── 加载打榜客户端库 ─────────────────────────────────────────
+LB_CLIENT="${SCRIPT_DIR}/lib/leaderboard-client.sh"
+if [[ -f "${LB_CLIENT}" ]]; then
+    set +u  # 库内部可能引用未设置变量
+    source "${LB_CLIENT}"
+    set -u
+fi
+
 # 直接定义基本变量（避免 source common.sh 时的循环依赖）
 VITA_HOME="${HOME}/.vita"
 CONFIG_DIR="$VITA_HOME/config"
@@ -82,9 +90,38 @@ interactive_setup() {
     read -r -p "性别 (male/female/other) [male]: " gender
     gender="${gender:-male}"
 
-    # 打榜昵称
-    read -r -p "打榜昵称 (留空跳过): " nickname
-    nickname="${nickname:-}"
+    # ── 打榜注册 ──
+    echo ""
+    echo "◆ 全球打榜PK"
+    echo "─────────────────────────────────────────"
+    echo "和其他玩家比拼锻炼完成率，查看排行榜排名。"
+    read -r -p "是否参与打榜？[Y/n] " leaderboard_enabled
+    leaderboard_enabled="${leaderboard_enabled:-y}"
+
+    if [[ "$leaderboard_enabled" =~ ^[Yy] ]]; then
+        leaderboard_enabled="true"
+        read -r -p "打榜显示名称 [匿名战士]: " lb_display
+        lb_display="${lb_display:-匿名战士}"
+
+        if declare -f lb_register >/dev/null 2>&1; then
+            echo -n "  注册打榜账号..."
+            local lb_uid
+            lb_uid="$(lb_register "$lb_display" 2>/dev/null)" || true
+            if [[ -n "$lb_uid" ]]; then
+                echo " 已加入 (ID: ${lb_uid})"
+            else
+                echo " 网络不通，将在首次联网时自动重试"
+            fi
+        else
+            echo "  打榜客户端库未找到，跳过注册 (leaderboard-client.sh)"
+        fi
+    else
+        leaderboard_enabled="false"
+        if declare -f lb_set_privacy_mode >/dev/null 2>&1; then
+            lb_set_privacy_mode "true" 2>/dev/null || true
+        fi
+        echo "  已设置隐私模式，不参与打榜"
+    fi
 
     # 久坐提醒间隔
     echo ""
@@ -114,10 +151,10 @@ interactive_setup() {
     if [[ -f "$config_file" ]]; then
         # 使用临时文件
         local tmp_config; tmp_config=$(mktemp)
-        sed -e "s/nickname: \"\"/nickname: \"${nickname}\"/" \
-            -e "s/interval_minutes: 30/interval_minutes: ${sed_interval}/" \
+        sed -e "s/interval_minutes: 30/interval_minutes: ${sed_interval}/" \
             -e "s/interval_minutes: 50/interval_minutes: ${eye_interval}/" \
             -e "s/interval_minutes: 75/interval_minutes: ${hyd_interval}/" \
+            -e "s/leaderboard_enabled: false/leaderboard_enabled: ${leaderboard_enabled}/" \
             "$config_file" > "$tmp_config"
         mv "$tmp_config" "$config_file"
     fi

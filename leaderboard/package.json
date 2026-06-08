@@ -5,14 +5,14 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create vita-leaderboard-db",
-    "db:migrate": "wrangler d1 execute vita-leaderboard-db --file=./db/schema.sql",
-    "db:seed": "wrangler d1 execute vita-leaderboard-db --file=./db/seed.sql"
+    "db:migrate": "wrangler d1 execute vita-leaderboard-db --file=./db/migrations/001_init.sql"
   },
   "dependencies": {
     "hono": "^4.0.0"
   },
   "devDependencies": {
-    "wrangler": "^3.0.0",
-    "@cloudflare/workers-types": "^4.0.0"
+    "@cloudflare/workers-types": "^4.0.0",
+    "typescript": "^6.0.3",
+    "wrangler": "^3.0.0"
   }
 }

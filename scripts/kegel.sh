@@ -17,6 +17,23 @@ fi
 # shellcheck source=./lib/common.sh
 source "${COMMON_SH}"
 
+# ── 加载打榜客户端库 ─────────────────────────────────────────
+LB_CLIENT="${SCRIPT_DIR}/lib/leaderboard-client.sh"
+if [[ -f "${LB_CLIENT}" ]]; then
+    # shellcheck source=./lib/leaderboard-client.sh
+    source "${LB_CLIENT}"
+else
+    # 打榜库不存在时，提供占位函数确保脚本不崩溃
+    lb_checkin() { return 0; }
+    lb_get_rank() { echo '{"error":"打榜库未安装"}'; }
+    lb_get_leaderboard() { echo '{"error":"打榜库未安装"}'; }
+    lb_get_stats() { echo '{"error":"打榜库未安装"}'; }
+    lb_register() { echo "[WARN] 打榜库未安装，跳过注册" >&2; return 0; }
+    lb_get_user_id() { return 1; }
+    lb_is_registered() { return 1; }
+    lb_get_pending_count() { echo "0"; }
+fi
+
 # ── 模块常量 ────────────────────────────────────────────────────
 readonly MODULE="kegel"
 readonly STATE_FILE="${HOME}/.vita/state/kegel.json"
@@ -200,20 +217,27 @@ message_for_session() {
 # ── 打榜上报 ────────────────────────────────────────────────────
 
 report_leaderboard() {
-    local api_url user_id
-    api_url="$(kegel_config leaderboard_api "")"
-    user_id="$(kegel_config leaderboard_user_id "")"
-    [[ -z "$api_url" || -z "$user_id" ]] && return 0
+    # 检查打榜是否启用
+    local lb_enabled
+    lb_enabled="$(kegel_config leaderboard_enabled "false")"
+    [[ "$lb_enabled" != "true" ]] && return 0
 
-    local today_done
-    today_done="$(_json_get_int "$(_load_state)" "today_done")"
+    local user_id
+    user_id="$(lb_get_user_id 2>/dev/null)" || { log_message "DEBUG" "$MODULE" "打榜用户未注册，跳过上报"; return 0; }
+
+    local state today_done
+    state="$(_load_state)"
+    today_done="$(_json_get_int "$state" "today_done")"
     today_done="${today_done:-0}"
 
-    curl -s -o /dev/null -w "%{http_code}" \
-        -X POST "${api_url}/api/checkin" \
-        -H "Content-Type: application/json" \
-        -d "{\"user_id\":\"${user_id}\",\"date\":\"$(date '+%Y-%m-%d')\",\"sets\":$(_json_get_int "$(_load_state)" "total_sets"),\"checkin_count\":${today_done}}" \
-        --connect-timeout 5 --max-time 10 2>/dev/null || true
+    local start_date stage params reps hold
+    start_date="$(kegel_config start_date "")"
+    stage="$(stage_from_date "$start_date")"
+    params="$(stage_params "$stage")"
+    reps="$(echo "$params" | cut -d'|' -f2)"
+    hold="$(echo "$params" | cut -d'|' -f3)"
+
+    lb_checkin "$user_id" "$today_done" "$reps" "$hold" 2>/dev/null || true
 }
 
 # ── 命令: init ──────────────────────────────────────────────────
@@ -222,7 +246,7 @@ cmd_init() {
     echo "=== 提肛锻炼提醒模块初始化 ==="
     echo ""
 
-    local gender start_date reminder_times lb_api lb_uid today
+    local gender start_date reminder_times lb_enabled lb_display today
     today="$(date '+%Y-%m-%d')"
 
     printf '性别 (male/female/neutral) [neutral]: '
@@ -234,11 +258,30 @@ cmd_init() {
     printf '提醒时间 (逗号分隔 HH:MM) [09:00,13:00,20:00]: '
     read -r reminder_times; reminder_times="${reminder_times:-09:00,13:00,20:00}"
 
-    printf '打榜API地址 (留空跳过): '
-    read -r lb_api; lb_api="${lb_api:-}"
+    printf '是否参与全球打榜PK? (y/n) [y]: '
+    read -r lb_enabled; lb_enabled="${lb_enabled:-y}"
 
-    printf '打榜用户ID (留空跳过): '
-    read -r lb_uid; lb_uid="${lb_uid:-}"
+    if [[ "$lb_enabled" == "y" || "$lb_enabled" == "Y" ]]; then
+        lb_enabled="true"
+        printf '打榜显示名称 [匿名战士]: '
+        read -r lb_display; lb_display="${lb_display:-匿名战士}"
+
+        # 调用打榜注册
+        echo -n "  注册打榜账号..."
+        local lb_uid
+        lb_uid="$(lb_register "$lb_display" 2>/dev/null)" || true
+        if [[ -n "$lb_uid" ]]; then
+            echo " 已加入打榜 (ID: ${lb_uid})"
+        else
+            echo " 网络不通，将在后台重试"
+        fi
+    elif [[ "$lb_enabled" == "n" || "$lb_enabled" == "N" ]]; then
+        lb_enabled="false"
+        if declare -f lb_set_privacy_mode >/dev/null 2>&1; then
+            lb_set_privacy_mode "true"
+        fi
+        echo "  已设置隐私模式，不参与打榜"
+    fi
 
     # 写入状态
     cat > "$STATE_FILE" <<JSONEOF
@@ -254,11 +297,10 @@ health-kegel:
   gender: ${gender}
   start_date: "${start_date}"
   reminder_times: "${reminder_times}"
-  leaderboard_api: "${lb_api}"
-  leaderboard_user_id: "${lb_uid}"
+  leaderboard_enabled: ${lb_enabled}
 YAMLEOF
 
-    log_message "INFO" "$MODULE" "初始化完成: gender=${gender} start_date=${start_date}"
+    log_message "INFO" "$MODULE" "初始化完成: gender=${gender} start_date=${start_date} leaderboard=${lb_enabled}"
     echo ""
     echo "=== 初始化完成 ==="
     echo "状态文件: $STATE_FILE"
@@ -456,6 +498,104 @@ cmd_status() {
     printf "  累计打卡天数: %s\n" "$total_days"
     printf "  累计完成组数: %s\n" "$total_sets"
     echo ""
+
+    # ── 打榜排名信息 ──
+    if lb_is_registered; then
+        local lb_enabled
+        lb_enabled="$(kegel_config leaderboard_enabled "false")"
+        if [[ "$lb_enabled" == "true" ]]; then
+            local rank_info rank_text percentile
+            rank_info="$(lb_get_rank "$(lb_get_user_id)" 2>/dev/null)" || true
+            rank_text="$(_lb_json_get_int "$rank_info" "rank")"
+            if [[ -n "$rank_text" ]] && [[ "$rank_text" != "null" ]]; then
+                percentile="$(_lb_json_get_int "$rank_info" "percentile")"
+                local score
+                score="$(_lb_json_get_int "$rank_info" "score")"
+                echo "  ═══ 打榜排名 ═══"
+                printf "  当前排名:     #%s\n" "$rank_text"
+                [[ -n "$score" ]] && [[ "$score" != "null" ]] && printf "  积分:         %s\n" "$score"
+                [[ -n "$percentile" ]] && [[ "$percentile" != "null" ]] && printf "  超越:         %s%% 玩家\n" "$percentile"
+            fi
+            # 检查离线队列
+            local pending_count
+            pending_count="$(lb_get_pending_count)"
+            if [[ "$pending_count" != "0" ]]; then
+                printf "  离线缓存:     %s 条待同步\n" "$pending_count"
+            fi
+        fi
+    fi
+    echo ""
+}
+
+# ── 命令: leaderboard ──────────────────────────────────────────
+
+cmd_leaderboard() {
+    local type="${1:-weekly}"
+
+    case "$type" in
+        weekly|monthly|alltime) ;;
+        *)
+            echo "用法: kegel.sh --leaderboard [weekly|monthly|alltime]"
+            return 1
+            ;;
+    esac
+
+    echo "=== 提肛打榜 (${type}) ==="
+    echo ""
+
+    # 全局统计
+    local stats total_users total_checkins
+    stats="$(lb_get_stats 2>/dev/null)" || true
+    total_users="$(_lb_json_get_int "$stats" "total_users")"
+    total_checkins="$(_lb_json_get_int "$stats" "total_checkins")"
+    if [[ -n "$total_users" ]] && [[ "$total_users" != "null" ]]; then
+        printf "全球参与者: %s 人 | 总打卡: %s 次\n" "$total_users" "${total_checkins:-?}"
+    fi
+    echo ""
+
+    # 排行榜
+    local board entries
+    board="$(lb_get_leaderboard "$type" 2>/dev/null)" || true
+
+    # 解析排行榜条目：找到 "entries" 数组内的对象，提取 rank/display_name/score/sets
+    local entries_str
+    entries_str="$(echo "$board" | grep -o '"rank":[[:space:]]*[0-9]*\|"display_name":[[:space:]]*"[^"]*"\|"score":[[:space:]]*[0-9]*\|"sets":[[:space:]]*[0-9]*' 2>/dev/null)" || true
+
+    if [[ -z "$entries_str" ]]; then
+        echo "  排行榜数据暂不可用"
+        echo ""
+        return 0
+    fi
+
+    # 简单表格输出
+    printf "  %-4s %-16s %-8s %-6s\n" "排名" "昵称" "积分" "组数"
+    printf "  %-4s %-16s %-8s %-6s\n" "----" "----------------" "--------" "------"
+
+    local rank disp_name score sets
+    while IFS= read -r line; do
+        case "$line" in
+            *'"rank"'*)
+                rank="$(echo "$line" | grep -o '[0-9]*')"
+                ;;
+            *'"display_name"'*)
+                disp_name="$(echo "$line" | sed 's/.*"display_name"[[:space:]]*:[[:space:]]*"//; s/"$//')"
+                ;;
+            *'"score"'*)
+                score="$(echo "$line" | grep -o '[0-9]*')"
+                ;;
+            *'"sets"'*)
+                sets="$(echo "$line" | grep -o '[0-9]*')"
+                if [[ -n "$rank" ]]; then
+                    printf "  %-4s %-16s %-8s %-6s\n" "#${rank}" "${disp_name:-?}" "${score:-0}" "${sets:-0}"
+                    rank="" disp_name="" score="" sets=""
+                fi
+                ;;
+        esac
+    done <<< "$entries_str"
+
+    echo ""
+    echo "提示: 使用 --leaderboard weekly|monthly|alltime 切换周期"
+    return 0
 }
 
 # ── 命令: daemon ────────────────────────────────────────────────
@@ -503,9 +643,10 @@ cmd_help() {
 模式:
   --remind          发送今日提醒通知（精确到时段）
   --done [N]        确认完成 N 组（默认 1 组）
-  --status          查看训练状态
+  --status          查看训练状态与打榜排名
   --daemon          守护进程模式（常驻后台）
-  --init            初始化配置
+  --init            初始化配置（含打榜注册）
+  --leaderboard [周期] 查看打榜排行 (weekly/monthly/alltime)
   --help            显示此帮助
 
 示例:
@@ -515,6 +656,8 @@ cmd_help() {
   kegel.sh --done 2
   kegel.sh --status
   kegel.sh --daemon
+  kegel.sh --leaderboard
+  kegel.sh --leaderboard monthly
 
 调度:
   crontab 示例（每时段精确调用）:
@@ -555,6 +698,10 @@ main() {
             ;;
         --daemon|daemon)
             cmd_daemon
+            ;;
+        --leaderboard|leaderboard|--lb)
+            shift
+            cmd_leaderboard "${1:-weekly}"
             ;;
         --help|help|-h|"")
             cmd_help
