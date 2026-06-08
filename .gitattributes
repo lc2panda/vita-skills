@@ -6,3 +6,7 @@ eye-care-research.md export-ignore
 hydration-research.md export-ignore
 kegel-research.md export-ignore
 leaderboard-research.md export-ignore
+CHANGELOG.md export-ignore
+CONTRIBUTING.md export-ignore
+tests/ export-ignore
+docs/ export-ignore
