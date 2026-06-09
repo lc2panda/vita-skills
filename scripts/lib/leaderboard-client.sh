@@ -94,7 +94,7 @@ _lb_add_pending() {
     local pending
     pending="$(_lb_load_pending)"
     local now; now="$(date '+%Y-%m-%dT%H:%M:%S%z')"
-    local entry="{\"user_id\":\"${user_id}\",\"sets\":${sets},\"reps\":${reps},\"hold\":${hold},\"queued_at\":\"${now}\"}"
+    local entry="{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\",\"queued_at\":\"${now}\"}"
     if [[ "$pending" == "[]" ]]; then
         pending="[${entry}]"
     else
@@ -124,9 +124,9 @@ _lb_flush_pending() {
 
         local uid sets reps hold
         uid="$(_lb_json_get_str "{$entry}" "user_id")"
-        sets="$(_lb_json_get_int "{$entry}" "sets")"
-        reps="$(_lb_json_get_int "{$entry}" "reps")"
-        hold="$(_lb_json_get_int "{$entry}" "hold")"
+        sets="$(_lb_json_get_int "{$entry}" "sets_completed")"
+        reps="$(_lb_json_get_int "{$entry}" "reps_per_set")"
+        hold="$(_lb_json_get_int "{$entry}" "hold_seconds")"
 
         if lb_checkin "$uid" "$sets" "$reps" "$hold" 2>/dev/null; then
             flushed=$((flushed + 1))
@@ -186,7 +186,7 @@ lb_register() {
     fi
 
     local resp http_code
-    resp="$(_lb_curl_post "/api/register" "{\"display_name\":\"${display_name}\"}")"
+    resp="$(_lb_curl_post "/api/user/register" "{\"display_name\":\"${display_name}\"}")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
@@ -223,7 +223,7 @@ lb_checkin() {
     fi
 
     local resp http_code
-    resp="$(_lb_curl_post "/api/checkin" "{\"user_id\":\"${user_id}\",\"sets\":${sets},\"reps\":${reps},\"hold\":${hold},\"date\":\"$(date '+%Y-%m-%d')\"}")"
+    resp="$(_lb_curl_post "/api/checkin" "{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\"}")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
@@ -255,7 +255,7 @@ lb_get_rank() {
     fi
 
     local resp http_code
-    resp="$(_lb_curl_get "/api/rank/${user_id}")"
+    resp="$(_lb_curl_get "/api/user/${user_id}")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
