@@ -18,6 +18,9 @@ readonly LB_OFFLINE_FILE="${LB_STATE_DIR}/leaderboard-pending.json"
 readonly LB_API_TIMEOUT=10
 readonly LB_API_CONNECT_TIMEOUT=5
 
+# HMAC-SHA256 共享密钥（需与服务端一致）
+readonly SHARED_SECRET="${VITA_HMAC_SECRET:-vita-health-hmac-secret-2026}"
+
 # ── 目录确保 ────────────────────────────────────────────────
 _lb_ensure_dir() {
     mkdir -p "$LB_STATE_DIR" 2>/dev/null || true
@@ -162,15 +165,38 @@ _lb_curl_get() {
 }
 
 _lb_curl_post() {
-    local path="$1" data="$2" token="${3:-}"
+    local path="$1" data="$2" token="${3:-}" hmac="${4:-}"
     local api_base
     api_base="$(_lb_api_base)"
     local curl_args=(-s -w "\n%{http_code}" -X POST -H "Content-Type: application/json")
     if [[ -n "$token" ]]; then
         curl_args+=(-H "Authorization: Bearer ${token}")
     fi
+    if [[ -n "$hmac" ]]; then
+        # HMAC header 格式: "timestamp:signature"
+        local hmac_ts="${hmac%%:*}"
+        local hmac_sig="${hmac##*:}"
+        curl_args+=(-H "X-Timestamp: ${hmac_ts}" -H "X-Signature: ${hmac_sig}")
+    fi
     curl_args+=(--connect-timeout "$LB_API_CONNECT_TIMEOUT" --max-time "$LB_API_TIMEOUT" -d "$data" "${api_base}${path}")
     curl "${curl_args[@]}" 2>/dev/null || echo -e "\n000"
+}
+
+# ── HMAC-SHA256 签名生成 ─────────────────────────────────────
+# 客户端签名: hex(HMAC-SHA256(secret, "timestamp:method:path:body"))
+# 输出: timestamp:signature (以冒号分隔)
+_lb_hmac_sign() {
+    local method="$1" path="$2" body="$3"
+    local timestamp
+    timestamp="$(date +%s)"
+    local payload="${timestamp}:${method}:${path}:${body}"
+    local sig
+    sig="$(echo -n "$payload" | openssl dgst -sha256 -hmac "$SHARED_SECRET" 2>/dev/null | awk '{print $NF}')"
+    if [[ -z "$sig" ]]; then
+        echo "[ERROR] _lb_hmac_sign: openssl 不可用或签名生成失败" >&2
+        return 1
+    fi
+    echo "${timestamp}:${sig}"
 }
 
 # ── 公开API ────────────────────────────────────────────────
@@ -239,7 +265,18 @@ lb_checkin() {
     fi
 
     local resp http_code
-    resp="$(_lb_curl_post "/api/checkin" "{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\"}" "$token")"
+    # 构造请求体（供签名和curl共用，确保签名体=请求体）
+    local body
+    body="{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\"}"
+
+    # 生成HMAC签名
+    local hmac_result
+    if ! hmac_result="$(_lb_hmac_sign "POST" "/api/checkin" "$body")"; then
+        echo "[ERROR] lb_checkin: HMAC签名生成失败" >&2
+        return 1
+    fi
+
+    resp="$(_lb_curl_post "/api/checkin" "$body" "$token" "$hmac_result")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
