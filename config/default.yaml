@@ -41,9 +41,10 @@ health-hydration:
   end_time: "18:00"              # 提醒结束时间
   do_not_disturb: []
 
-# --- 提肛锻炼提醒 (health-tigang) ---
+# --- 提肛锻炼提醒 (health-kegel) ---
 # 证据: TG1 (Cochrane 2024), TG2 (NIH/NIDDK), TG3 (Cleveland Clinic)
-health-tigang:
+# --- 提肛锻炼提醒 (health-kegel) ---
+health-kegel:
   enabled: true
   reminders_per_day: 3           # 每日提醒次数，可调范围 2-3
   stage: "beginner"              # beginner | transition | standard | advanced
@@ -52,7 +53,7 @@ health-tigang:
   hold_seconds: 3                # 保持秒数，可调范围 3-10
   rest_seconds: 3                # 休息秒数，保持/休息比 1:1
   privacy_mode: true             # 隐私模式：含蓄文案
-  leaderboard_enabled: false     # 是否参与打榜，init 时询问
+  leaderboard_enabled: true     # 是否参与打榜，init 时询问
   do_not_disturb:                # 免打扰时段
     - "22:00-07:00"
 

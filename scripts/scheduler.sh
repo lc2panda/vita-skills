@@ -59,7 +59,7 @@ read_module_schedule() {
 
     # 从配置读取 reminders_per_day，默认 3 次
     local per_day
-    per_day=$(read_config "health-${module}.reminders_per_day" "3")
+    per_day=$(read_config "health-kegel.reminders_per_day" "3")
     per_day=${per_day:-3}
 
     case "$per_day" in
@@ -366,7 +366,7 @@ run_scheduler() {
     # 计算 tigang 下一次触发 epoch 秒
     _next_tigang_epoch() {
         local tigang_times
-        tigang_times=$(read_config "health-tigang.daily_schedule" "")
+        tigang_times=$(read_config "health-kegel.daily_schedule" "")
         [[ -z "$tigang_times" ]] && tigang_times=$(read_config "modules.tigang.daily_schedule" "")
         [[ -z "$tigang_times" ]] && echo "0" && return
 
