@@ -162,16 +162,15 @@ _lb_curl_get() {
 }
 
 _lb_curl_post() {
-    local path="$1" data="$2"
+    local path="$1" data="$2" token="${3:-}"
     local api_base
     api_base="$(_lb_api_base)"
-    curl -s -w "\n%{http_code}" \
-        -X POST \
-        -H "Content-Type: application/json" \
-        -d "$data" \
-        --connect-timeout "$LB_API_CONNECT_TIMEOUT" \
-        --max-time "$LB_API_TIMEOUT" \
-        "${api_base}${path}" 2>/dev/null || echo -e "\n000"
+    local curl_args=(-s -w "\n%{http_code}" -X POST -H "Content-Type: application/json")
+    if [[ -n "$token" ]]; then
+        curl_args+=(-H "Authorization: Bearer ${token}")
+    fi
+    curl_args+=(--connect-timeout "$LB_API_CONNECT_TIMEOUT" --max-time "$LB_API_TIMEOUT" -d "$data" "${api_base}${path}")
+    curl "${curl_args[@]}" 2>/dev/null || echo -e "\n000"
 }
 
 # ── 公开API ────────────────────────────────────────────────
@@ -228,8 +227,19 @@ lb_checkin() {
         return 1
     fi
 
+    # 读取 token：优先 read_config，回退到本地状态文件
+    local token
+    if declare -f read_config >/dev/null 2>&1; then
+        token="$(read_config "health-leaderboard.token" "")"
+    fi
+    if [[ -z "$token" ]]; then
+        local state
+        state="$(_lb_load_state)"
+        token="$(_lb_json_get_str "$state" "token")"
+    fi
+
     local resp http_code
-    resp="$(_lb_curl_post "/api/checkin" "{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\"}")"
+    resp="$(_lb_curl_post "/api/checkin" "{\"user_id\":\"${user_id}\",\"sets_completed\":${sets},\"reps_per_set\":${reps},\"hold_seconds\":${hold},\"device_id\":\"$(uname -n)\"}" "$token")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
@@ -353,11 +363,12 @@ lb_set_privacy_mode() {
     local mode="${1:-true}"
     local state
     state="$(_lb_load_state)"
-    local user_id display_name registered
+    local user_id display_name registered token
     user_id="$(_lb_json_get_str "$state" "user_id")"
     display_name="$(_lb_json_get_str "$state" "display_name")"
     registered="$(_lb_json_get_bool "$state" "registered")"
+    token="$(_lb_json_get_str "$state" "token")"
     cat > "$LB_STATE_FILE" <<STATEEOF
-{"user_id":"${user_id}","display_name":"${display_name}","registered":${registered},"privacy_mode":${mode},"last_sync":"$(date '+%Y-%m-%dT%H:%M:%S%z')"}
+{"user_id":"${user_id}","token":"${token}","display_name":"${display_name}","registered":${registered},"privacy_mode":${mode},"last_sync":"$(date '+%Y-%m-%dT%H:%M:%S%z')"}
 STATEEOF
 }

@@ -22,6 +22,7 @@ import type {
 } from './types';
 import { BADGE_DEFINITIONS, computeLevel, computeCheckinScore } from './types';
 import { handleScheduled } from './cron/daily-stats';
+import { createAuthMiddleware } from './middleware/auth';
 
 // ============================================================
 // 应用初始化
@@ -225,10 +226,26 @@ async function computeStreakFromDB(
 }
 
 // ============================================================
-// 1. POST /api/checkin — 打卡上报
+// Bearer Token 认证中间件（Hono 包装器）
 // ============================================================
 
-app.post('/api/checkin', async (c) => {
+async function authMiddleware(c: any, next: any) {
+  const auth = createAuthMiddleware(c.env.DB);
+  const ctx = await auth.authenticate(c.req.raw);
+  if (!ctx) {
+    return c.json({
+      error: 'unauthorized',
+      message: 'Valid Bearer token required for this operation.',
+    }, 401);
+  }
+  await next();
+}
+
+// ============================================================
+// 1. POST /api/checkin — 打卡上报（需 Bearer Token 认证）
+// ============================================================
+
+app.post('/api/checkin', authMiddleware, async (c) => {
   const body = await c.req.json<CheckinRequest>();
   const { user_id, sets_completed, reps_per_set, hold_seconds, device_id } = body;
 
@@ -437,6 +454,10 @@ app.post('/api/user/register', async (c) => {
       'SELECT * FROM users WHERE device_id = ?'
     ).bind(device_id).first<UserRecord>();
     const token = generateToken();
+    // 持久化 token
+    await c.env.DB.prepare(
+      'UPDATE users SET token = ? WHERE id = ?'
+    ).bind(token, user!.id).run();
     const resp: RegisterResponse = {
       user_id: user!.id,
       token,
@@ -449,9 +470,9 @@ app.post('/api/user/register', async (c) => {
   const now = Math.floor(Date.now() / 1000);
 
   await c.env.DB.prepare(
-    `INSERT INTO users (id, display_name, device_id, created_at, score, streak, best_streak, level)
-     VALUES (?, ?, ?, ?, 0, 0, 0, 'bronze')`
-  ).bind(userId, display_name.trim(), device_id, now).run();
+    `INSERT INTO users (id, display_name, device_id, token, created_at, score, streak, best_streak, level)
+     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 'bronze')`
+  ).bind(userId, display_name.trim(), device_id, token, now).run();
 
   const resp: RegisterResponse = { user_id: userId, token };
   return c.json(resp, 201);

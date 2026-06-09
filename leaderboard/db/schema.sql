@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     id                  TEXT PRIMARY KEY,
     display_name        TEXT NOT NULL,
     device_id           TEXT NOT NULL,
+    token               TEXT,
     created_at          INTEGER NOT NULL DEFAULT (unixepoch()),
     opt_in_leaderboard  BOOLEAN NOT NULL DEFAULT 1,
     stage               TEXT NOT NULL DEFAULT 'beginner',
