@@ -186,7 +186,7 @@ lb_register() {
     fi
 
     local resp http_code
-    resp="$(_lb_curl_post "/api/user/register" "{\"display_name\":\"${display_name}\"}")"
+    resp="$(_lb_curl_post "/api/user/register" "{\"display_name\":\"${display_name}\",\"device_id\":\"$(uname -n)\"}")"
     http_code="$(echo "$resp" | tail -1)"
     local body; body="$(echo "$resp" | sed '$d')"
 
@@ -202,11 +202,17 @@ lb_register() {
         return 1
     fi
 
+    local token
+    token="$(_lb_json_get_str "$body" "token")"
+    if [[ -z "$token" ]]; then
+        echo "[ERROR] lb_register: 响应中未找到 token: ${body}" >&2
+        return 1
+    fi
+
     # 保存本地状态
-    local state
-    state="$(_lb_load_state)"
+    mkdir -p "$(dirname "$LB_STATE_FILE")"
     cat > "$LB_STATE_FILE" <<STATEEOF
-{"user_id":"${user_id}","display_name":"${display_name}","registered":true,"privacy_mode":false,"last_sync":"$(date '+%Y-%m-%dT%H:%M:%S%z')"}
+{"user_id":"${user_id}","token":"${token}","display_name":"${display_name}","registered":true,"privacy_mode":false,"last_sync":"$(date '+%Y-%m-%dT%H:%M:%S%z')"}
 STATEEOF
 
     echo "$user_id"
