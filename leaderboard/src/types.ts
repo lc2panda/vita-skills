@@ -21,6 +21,7 @@ export interface UserRecord {
   streak: number;
   best_streak: number;
   level: string;
+  [key: string]: unknown;
 }
 
 export interface CheckinRecord {

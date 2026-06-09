@@ -362,7 +362,7 @@ app.get('/api/leaderboard', async (c) => {
 
   // SQL 片段：SELECT 列 / FROM + JOIN / GROUP + ORDER + LIMIT
   const cols = `
-    u.id, u.display_name, u.opt_in_leaderboard,
+    u.id, u.display_name, u.opt_in_leaderboard, u.privacy_mode,
     u.streak, u.level,
     u.loyalty_score, u.loyalty_tier,
     SUM(c.sets_completed) AS total_sets,
@@ -376,7 +376,7 @@ app.get('/api/leaderboard', async (c) => {
   `;
 
   let rows: D1Result<{
-    id: string; display_name: string; opt_in_leaderboard: number;
+    id: string; display_name: string; opt_in_leaderboard: number; privacy_mode: number;
     streak: number; level: string; loyalty_score: number; loyalty_tier: string; total_sets: number; perfect_count: number;
   }>;
 
@@ -396,7 +396,7 @@ app.get('/api/leaderboard', async (c) => {
 
   const entries: LeaderboardEntry[] = rows.results.map((row, idx) => {
     const score = row.total_sets * 10 + row.streak * 5 + row.perfect_count * 5;
-    const displayName = row.opt_in_leaderboard ? row.display_name : '匿名用户';
+    const displayName = (row.opt_in_leaderboard && row.privacy_mode !== 1) ? row.display_name : '匿名用户';
     return {
       rank: idx + 1,
       name: displayName,
@@ -439,7 +439,7 @@ app.get('/api/user/:id', async (c) => {
   const sanitizedUser = sanitizeUserResponse(user);
 
   const resp: UserDetailResponse = {
-    name: sanitizedUser.display_name,
+    name: sanitizedUser.display_name as string,
     score: user.score,
     streak: user.streak,
     level: user.level,
