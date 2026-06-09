@@ -3,7 +3,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
-tests/
+#tests/ (解锁测试脚本) 
 __tests__/
 test/
 *.test.*
@@ -19,3 +19,5 @@ references/kegel-research.md
 references/leaderboard-research.md
 references/sedentary-research.md
 references/skills-spec-research.md
+CHANGELOG.md
+CONTRIBUTING.md

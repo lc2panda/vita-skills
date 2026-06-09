@@ -29,7 +29,7 @@ check "marketplace-install.sh 语法" "bash -n $PROJECT_ROOT/scripts/marketplace
 check "install.sh 语法" "bash -n $PROJECT_ROOT/scripts/install.sh"
 
 # 4. CLAUDE.md 引用检查
-check "CLAUDE.md 存在" "test -f $PROJECT_ROOT/CLAUDE.md"
+check "CLAUDE.md 存在" "test -f $HOME/.pandacc/CLAUDE.md"
 
 # 5. SKILL.md 存在
 check "SKILL.md 存在" "test -f $PROJECT_ROOT/SKILL.md"
