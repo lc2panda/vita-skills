@@ -14,6 +14,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 FLOW_DETECTOR="$SCRIPT_DIR/flow-detector.sh"
 CHANNEL_ADAPTER="$SCRIPT_DIR/channel-adapter.sh"
 ADAPTIVE_ENGINE="$SCRIPT_DIR/adaptive-engine.sh"
+source "$SCRIPT_DIR/lib/leaderboard-client.sh"
 
 # ── 全局状态文件 ─────────────────────────────────────────
 STATE_RUNNING="$STATE_DIR_DEFAULT/scheduler_running"
@@ -247,6 +248,23 @@ trigger_module() {
 
     # 记录到调度日志
     log_message "TRIGGER" "$module" "$message"
+
+    # 提肛模块自动提交排行榜
+    if [[ "$module" == "tigang" ]]; then
+        local lb_enabled
+        lb_enabled=$(read_config "health-tigang.leaderboard_enabled" "false")
+        if [[ "$lb_enabled" == "true" ]]; then
+            local lb_user_id
+            lb_user_id=$(lb_get_user_id 2>/dev/null || true)
+            if [[ -n "$lb_user_id" ]]; then
+                local reps
+                reps=$(read_config "health-tigang.reps_per_set" "15")
+                local hold
+                hold=$(read_config "health-tigang.hold_seconds" "30")
+                lb_checkin "$lb_user_id" "1" "$reps" "$hold" 2>/dev/null &
+            fi
+        fi
+    fi
 }
 
 # ── 检查 tigang 固定时间是否命中 ──────────────────────────
