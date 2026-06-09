@@ -123,7 +123,7 @@ channel_desktop() {
         sedentary) title="久坐提醒"; sound="Glass";;
         eye-care)  title="护眼提醒"; sound="Glass";;
         hydration) title="喝水提醒"; sound="Glass";;
-        kegel)     title="凯格尔训练"; sound="Glass";;
+        tigang)     title="提肛训练"; sound="Glass";;
         *)         title="健康提醒"; sound="Glass";;
     esac
 
@@ -147,7 +147,7 @@ channel_terminal() {
         sedentary) icon="[椅]";;
         eye-care)  icon="[眼]";;
         hydration) icon="[水]";;
-        kegel)     icon="[凯]";;
+        tigang)     icon="[提]";;
         *)         icon="[♡]";;
     esac
 

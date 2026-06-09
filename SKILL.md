@@ -1,6 +1,6 @@
 ---
 name: vita-health
-description: 香草健康管理 — 久坐/用眼/喝水/凯格尔锻炼智能提醒系统，集成心流自适应、多通道通知和全球打榜PK。通过后台调度守护自然嵌入工作流，无需安装独立App。
+description: 香草健康管理 — 久坐/用眼/喝水/提肛锻炼智能提醒系统，集成心流自适应、多通道通知和全球打榜PK。通过后台调度守护自然嵌入工作流，无需安装独立App。
 license: MIT
 compatibility: claude-code, codex, cherry-studio, windsurf, cursor, pandacc, and 40+ agent-skills platforms
 metadata:
@@ -37,7 +37,7 @@ allowed-tools: bash, read, write
 - **时间窗口**：09:00-18:00，持续运行模式
 - **进度查询**：`bash scripts/hydration.sh --status`
 
-### 4. 凯格尔训练 — `kegel.sh`
+### 4. 提肛训练 — `tigang.sh`
 - **默认频率**：每日 3 次
 - **科学依据**：Cochrane 2024 系统综述（63 RCT/4,920 人），PFMT 为尿失禁一线推荐疗法 (RR=8.38)；Cleveland Clinic + NIH/NIDDK 临床指导
 - **训练方案**：两阶段进阶——初学者（2组/天，10次/组，保持3-5s）→ 进阶（3组/天，15次/组，保持5-10s），config 预留 transition/standard 四阶段扩展位
@@ -132,7 +132,7 @@ vita config edit
 - **详见**：`leaderboard/API.md`、`leaderboard/README.md`
 
 ### 客户端 — `scripts/lib/leaderboard-client.sh`
-处理 API 调用、签名生成、离线队列和自动重试。由 `kegel.sh` 和 `install.sh` 集成调用。
+处理 API 调用、签名生成、离线队列和自动重试。由 `tigang.sh` 和 `install.sh` 集成调用。
 
 ## 共享库 — `scripts/lib/`
 
@@ -164,7 +164,7 @@ vita test                           # 端到端通知测试
 | PFMT 为尿失禁一线疗法 (RR=8.38) | 3+ | *Cochrane* Dumoulin 2024 (63 RCT/4,920 participants) |
 | 渐进式提醒比固定频率更有效 | 2+ | Fogg Behavior Model, Hydroprompt 2016 |
 
-**完整科学依据、来源编号与交叉验证矩阵**详见 `references/health-guidelines.md`（45+ 独立来源）。各领域研究文献综述见根目录 `sedentary-research.md`、`eye-care-research.md`、`hydration-research.md`、`kegel-research.md`。
+**完整科学依据、来源编号与交叉验证矩阵**详见 `references/health-guidelines.md`（45+ 独立来源）。各领域研究文献综述见根目录 `sedentary-research.md`、`eye-care-research.md`、`hydration-research.md`、`tigang-research.md`。
 
 ## 子代理协作模式
 
@@ -172,7 +172,7 @@ vita test                           # 端到端通知测试
 
 - **调度子代理**：运行 `scripts/scheduler.sh`，负责计时器管理与触发分发
 - **检测子代理**：运行 `scripts/flow-detector.sh`，判定当前心流等级
-- **提醒子代理**：运行 `scripts/sedentary.sh` / `eye-care.sh` / `hydration.sh` / `kegel.sh`，生成并发送提醒
+- **提醒子代理**：运行 `scripts/sedentary.sh` / `eye-care.sh` / `hydration.sh` / `tigang.sh`，生成并发送提醒
 - **适配子代理**：运行 `scripts/adaptive-engine.sh`，根据用户响应更新评分
 - **打榜子代理**：通过 `scripts/lib/leaderboard-client.sh` 上报打卡数据
 

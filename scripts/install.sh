@@ -135,16 +135,16 @@ interactive_setup() {
     hyd_interval="${hyd_interval:-75}"
 
     echo ""
-    echo "◆ 凯格尔设置"
+    echo "◆ 提肛设置"
     echo "─────────────────────────────────────────"
     if [[ "$gender" == "female" ]]; then
-        echo "凯格尔训练对女性尤为重要——可预防压力性尿失禁、改善产后恢复。"
+        echo "提肛训练对女性尤为重要——可预防压力性尿失禁、改善产后恢复。"
     else
-        echo "凯格尔训练对男性同样重要——可增强盆底肌、改善排尿控制。"
+        echo "提肛训练对男性同样重要——可增强盆底肌、改善排尿控制。"
     fi
-    read -r -p "启用凯格尔提醒？[Y/n] " kegel_enabled
-    kegel_enabled="${kegel_enabled:-y}"
-    [[ "$kegel_enabled" =~ ^[Yy] ]] && kegel_enabled="true" || kegel_enabled="false"
+    read -r -p "启用提肛提醒？[Y/n] " tigang_enabled
+    tigang_enabled="${tigang_enabled:-y}"
+    [[ "$tigang_enabled" =~ ^[Yy] ]] && tigang_enabled="true" || tigang_enabled="false"
 
     # 更新配置
     local config_file="$CONFIG_DIR/config.yaml"

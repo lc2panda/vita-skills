@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Input:  打榜API地址 / 用户凭据 / 打卡数据
 # Output: API响应 / 本地缓存文件 / 离线队列
-# Pos:    scripts/lib/leaderboard-client.sh — 打榜PK系统客户端库，被kegel.sh/install.sh引用
+# Pos:    scripts/lib/leaderboard-client.sh — 打榜PK系统客户端库，被tigang.sh/install.sh引用
 #
 # 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
 # 不可独立执行，需被 source 引入
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-    echo "[FATAL] leaderboard-client.sh 是一个库，不可直接执行。请通过 kegel.sh 或 install.sh 调用。" >&2
+    echo "[FATAL] leaderboard-client.sh 是一个库，不可直接执行。请通过 tigang.sh 或 install.sh 调用。" >&2
     exit 1
 fi
 

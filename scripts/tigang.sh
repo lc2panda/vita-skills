@@ -35,8 +35,8 @@ else
 fi
 
 # ── 模块常量 ────────────────────────────────────────────────────
-readonly MODULE="kegel"
-readonly STATE_FILE="${HOME}/.vita/state/kegel.json"
+readonly MODULE="tigang"
+readonly STATE_FILE="${HOME}/.vita/state/tigang.json"
 
 # 确保目录存在
 _ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
@@ -44,10 +44,10 @@ _ensure_dir "$(dirname "$STATE_FILE")"
 
 # ── 配置读取 ────────────────────────────────────────────────────
 
-kegel_config() {
+tigang_config() {
     local key="$1"
     local default="${2:-}"
-    read_config "health-kegel.${key}" "${default}"
+    read_config "health-tigang.${key}" "${default}"
 }
 
 # ── 日期计算 ────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ message_for_session() {
 report_leaderboard() {
     # 检查打榜是否启用
     local lb_enabled
-    lb_enabled="$(kegel_config leaderboard_enabled "false")"
+    lb_enabled="$(tigang_config leaderboard_enabled "false")"
     [[ "$lb_enabled" != "true" ]] && return 0
 
     local user_id
@@ -231,7 +231,7 @@ report_leaderboard() {
     today_done="${today_done:-0}"
 
     local start_date stage params reps hold
-    start_date="$(kegel_config start_date "")"
+    start_date="$(tigang_config start_date "")"
     stage="$(stage_from_date "$start_date")"
     params="$(stage_params "$stage")"
     reps="$(echo "$params" | cut -d'|' -f2)"
@@ -293,7 +293,7 @@ JSONEOF
     cat >> "$cfg" <<YAMLEOF
 
 # ── 提肛锻炼提醒模块 ──
-health-kegel:
+health-tigang:
   gender: ${gender}
   start_date: "${start_date}"
   reminder_times: "${reminder_times}"
@@ -311,9 +311,9 @@ YAMLEOF
 
 cmd_remind() {
     local start_date gender reminder_times
-    start_date="$(kegel_config start_date "")"
-    gender="$(kegel_config gender "neutral")"
-    reminder_times="$(kegel_config reminder_times "09:00,13:00,20:00")"
+    start_date="$(tigang_config start_date "")"
+    gender="$(tigang_config gender "neutral")"
+    reminder_times="$(tigang_config reminder_times "09:00,13:00,20:00")"
 
     if [[ -z "$start_date" ]]; then
         log_message "WARN" "$MODULE" "未配置开始日期，请先运行 init"
@@ -463,7 +463,7 @@ cmd_status() {
     _save_state "$state"
 
     local start_date
-    start_date="$(kegel_config start_date "")"
+    start_date="$(tigang_config start_date "")"
     local stage
     stage="$(stage_from_date "$start_date")"
 
@@ -502,7 +502,7 @@ cmd_status() {
     # ── 打榜排名信息 ──
     if lb_is_registered; then
         local lb_enabled
-        lb_enabled="$(kegel_config leaderboard_enabled "false")"
+        lb_enabled="$(tigang_config leaderboard_enabled "false")"
         if [[ "$lb_enabled" == "true" ]]; then
             local rank_info rank_text percentile
             rank_info="$(lb_get_rank "$(lb_get_user_id)" 2>/dev/null)" || true
@@ -535,7 +535,7 @@ cmd_leaderboard() {
     case "$type" in
         weekly|monthly|alltime) ;;
         *)
-            echo "用法: kegel.sh --leaderboard [weekly|monthly|alltime]"
+            echo "用法: tigang.sh --leaderboard [weekly|monthly|alltime]"
             return 1
             ;;
     esac
@@ -602,16 +602,16 @@ cmd_leaderboard() {
 
 cmd_daemon() {
     if ! acquire_lock; then
-        log_info "kegel daemon 已在运行"
+        log_info "tigang daemon 已在运行"
         return 1
     fi
 
-    log_info "kegel daemon 启动 (PID: $$)"
+    log_info "tigang daemon 启动 (PID: $$)"
 
-    setup_signal_handlers "log_info 'kegel daemon 退出'" ""
+    setup_signal_handlers "log_info 'tigang daemon 退出'" ""
 
     local reminder_times interval
-    reminder_times="$(kegel_config reminder_times "09:00,13:00,20:00")"
+    reminder_times="$(tigang_config reminder_times "09:00,13:00,20:00")"
     # 检查间隔 60 秒
     interval=60
 
@@ -638,7 +638,7 @@ cmd_help() {
     cat <<HELPEOF
 提肛锻炼提醒模块 — 用法
 
-  kegel.sh <mode> [options]
+  tigang.sh <mode> [options]
 
 模式:
   --remind          发送今日提醒通知（精确到时段）
@@ -650,23 +650,23 @@ cmd_help() {
   --help            显示此帮助
 
 示例:
-  kegel.sh --init
-  kegel.sh --remind
-  kegel.sh --done
-  kegel.sh --done 2
-  kegel.sh --status
-  kegel.sh --daemon
-  kegel.sh --leaderboard
-  kegel.sh --leaderboard monthly
+  tigang.sh --init
+  tigang.sh --remind
+  tigang.sh --done
+  tigang.sh --done 2
+  tigang.sh --status
+  tigang.sh --daemon
+  tigang.sh --leaderboard
+  tigang.sh --leaderboard monthly
 
 调度:
   crontab 示例（每时段精确调用）:
-    0 9 * * *  /path/to/kegel.sh --remind
-    0 13 * * * /path/to/kegel.sh --remind
-    0 20 * * * /path/to/kegel.sh --remind
+    0 9 * * *  /path/to/tigang.sh --remind
+    0 13 * * * /path/to/tigang.sh --remind
+    0 20 * * * /path/to/tigang.sh --remind
 
   或使用 daemon 模式（推荐）:
-    kegel.sh --daemon &
+    tigang.sh --daemon &
 
 数据位置:
   配置文件: ${PROJECT_CONFIG_DIR:-${CONFIG_DIR_DEFAULT}}/default.yaml
@@ -708,8 +708,8 @@ main() {
             ;;
         --test-notify|test-notify)
             local start_date gender
-            start_date="$(kegel_config start_date "$(date '+%Y-%m-%d')")"
-            gender="$(kegel_config gender "neutral")"
+            start_date="$(tigang_config start_date "$(date '+%Y-%m-%d')")"
+            gender="$(tigang_config gender "neutral")"
             local stage sets_per_day reps hold_min hold_max
             stage="$(stage_from_date "$start_date")"
             sets_per_day="$(echo "$(stage_params "$stage")" | cut -d'|' -f1)"
