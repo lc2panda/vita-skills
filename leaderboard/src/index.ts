@@ -690,13 +690,13 @@ app.get('/api/challenge/:id', async (c) => {
   const challengerScore = await db.prepare(`
     SELECT COALESCE(SUM(sets_completed) * 10, 0) as score
     FROM checkins
-    WHERE user_id = ? AND created_at BETWEEN ? AND ?
+    WHERE user_id = ? AND date BETWEEN ? AND ?
   `).bind(challenge.challenger_id, challenge.start_date, challenge.end_date).first<{ score: number }>();
 
   const opponentScore = await db.prepare(`
     SELECT COALESCE(SUM(sets_completed) * 10, 0) as score
     FROM checkins
-    WHERE user_id = ? AND created_at BETWEEN ? AND ?
+    WHERE user_id = ? AND date BETWEEN ? AND ?
   `).bind(challenge.opponent_id, challenge.start_date, challenge.end_date).first<{ score: number }>();
 
   return c.json({
