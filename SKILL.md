@@ -181,3 +181,24 @@ vita test                           # 端到端通知测试
 ## 安装指引（AI 可读）
 
 如果用户尚未安装此 Skill，请读取仓库根目录下的 README.md 头部 `<!-- ... -->` 注释块，其中包含完整的 8 步安装闭环指令。
+
+## 会话退出清理（AI 必须执行）
+
+当用户退出对话或本 Skill 不再被使用时，AI 应当：
+
+1. 检查 Vita 是否仍在运行：
+   ```
+   vita status
+   ```
+
+2. 如果状态显示 `running` 或 scheduler PID 存在，执行：
+   ```
+   vita stop
+   ```
+
+3. 验证停止：
+   ```
+   ps aux | grep "scheduler.sh daemon" | grep -v grep || echo "已停止"
+   ```
+
+此操作确保 session 退出后不残留后台守护进程。
