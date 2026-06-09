@@ -409,3 +409,129 @@ lb_set_privacy_mode() {
 {"user_id":"${user_id}","token":"${token}","display_name":"${display_name}","registered":${registered},"privacy_mode":${mode},"last_sync":"$(date '+%Y-%m-%dT%H:%M:%S%z')"}
 STATEEOF
 }
+
+# lb_get_achievements(user_id, token) → 输出JSON成就列表到stdout
+lb_get_achievements() {
+    local user_id="$1"
+    local token="$2"
+
+    if [[ -z "$user_id" ]]; then
+        echo '{"error":"user_id为空"}'
+        return 1
+    fi
+
+    local resp http_code
+    resp="$(_lb_curl_get "/api/achievements/${user_id}")"
+    http_code="$(echo "$resp" | tail -1)"
+    local body; body="$(echo "$resp" | sed '$d')"
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "{\"error\":\"API返回HTTP ${http_code}\"}"
+        return 1
+    fi
+
+    echo "$body"
+    return 0
+}
+
+# lb_get_streak(user_id) → 输出JSON streak信息到stdout
+lb_get_streak() {
+    local user_id="$1"
+
+    if [[ -z "$user_id" ]]; then
+        echo '{"error":"user_id为空"}'
+        return 1
+    fi
+
+    local resp http_code
+    resp="$(_lb_curl_get "/api/user/${user_id}/streak")"
+    http_code="$(echo "$resp" | tail -1)"
+    local body; body="$(echo "$resp" | sed '$d')"
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "{\"error\":\"API返回HTTP ${http_code}\"}"
+        return 1
+    fi
+
+    echo "$body"
+    return 0
+}
+
+# lb_create_challenge(challenger_id, opponent_id, token[, end_date]) → 输出JSON挑战信息到stdout
+lb_create_challenge() {
+    local challenger_id="$1"
+    local opponent_id="$2"
+    local token="$3"
+    local end_date="${4:-}"
+
+    if [[ -z "$challenger_id" ]] || [[ -z "$opponent_id" ]] || [[ -z "$token" ]]; then
+        echo '{"error":"缺少必填参数 challenger_id / opponent_id / token"}'
+        return 1
+    fi
+
+    local payload="{\"challenger_id\":\"${challenger_id}\",\"opponent_id\":\"${opponent_id}\""
+    if [[ -n "$end_date" ]]; then
+        payload="${payload},\"end_date\":\"${end_date}\""
+    fi
+    payload="${payload}}"
+
+    local resp http_code
+    resp="$(_lb_curl_post "/api/challenge" "$payload" "$token")"
+    http_code="$(echo "$resp" | tail -1)"
+    local body; body="$(echo "$resp" | sed '$d')"
+
+    if [[ "$http_code" != "200" ]] && [[ "$http_code" != "201" ]]; then
+        echo "{\"error\":\"API返回HTTP ${http_code}: ${body}\"}"
+        return 1
+    fi
+
+    echo "$body"
+    return 0
+}
+
+# lb_get_challenges(user_id, token) → 输出JSON挑战列表到stdout
+lb_get_challenges() {
+    local user_id="$1"
+    local token="$2"
+
+    if [[ -z "$user_id" ]] || [[ -z "$token" ]]; then
+        echo '{"error":"缺少必填参数 user_id / token"}'
+        return 1
+    fi
+
+    local resp http_code
+    resp="$(_lb_curl_get "/api/challenges")"
+    http_code="$(echo "$resp" | tail -1)"
+    local body; body="$(echo "$resp" | sed '$d')"
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "{\"error\":\"API返回HTTP ${http_code}\"}"
+        return 1
+    fi
+
+    echo "$body"
+    return 0
+}
+
+# lb_get_challenge(challenge_id) → 输出JSON挑战详情到stdout
+lb_get_challenge() {
+    local challenge_id="$1"
+
+    if [[ -z "$challenge_id" ]]; then
+        echo '{"error":"challenge_id为空"}'
+        return 1
+    fi
+
+    local resp http_code
+    resp="$(_lb_curl_get "/api/challenge/${challenge_id}")"
+    http_code="$(echo "$resp" | tail -1)"
+    local body; body="$(echo "$resp" | sed '$d')"
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "{\"error\":\"API返回HTTP ${http_code}\"}"
+        return 1
+    fi
+
+    echo "$body"
+    return 0
+}

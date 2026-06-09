@@ -17,26 +17,9 @@ VALUES ('system', 'System', 'system');
 -- ============================================
 -- 徽章类型与 src/types.ts BADGE_DEFINITIONS 完全对齐
 -- 后续由 Worker 根据用户行为动态授予
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'first_checkin', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'streak_7', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'streak_30', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'streak_100', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'perfect_sets_10', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'score_100', unixepoch());
-
-INSERT OR IGNORE INTO badges (user_id, badge_type, awarded_at)
-VALUES ('system', 'score_500', unixepoch());
+-- system 用户的 badges 已移除（避免污染成就查询 /api/achievements/:user_id）
+-- 徽章应由 Worker 在真实用户达成条件时动态授予
+-- ============================================
 
 -- ============================================
 -- 每日统计基线记录

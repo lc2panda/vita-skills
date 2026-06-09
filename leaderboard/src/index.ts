@@ -27,6 +27,7 @@ import { BADGE_DEFINITIONS, computeLevel, computeCheckinScore, computeLoyaltyTie
 import { handleScheduled } from './cron/daily-stats';
 import { createAuthMiddleware } from './middleware/auth';
 import { hmacMiddleware } from './middleware/hmac';
+import { createAntiCheatValidator } from './middleware/anti-cheat';
 import { sanitizeUserResponse, sanitizeUserListResponse } from './middleware/privacy';
 
 // ============================================================
@@ -92,6 +93,12 @@ app.use('*', async (c, next) => {
     return c.json({ error: '请求过于频繁，请稍后再试', retry_after_seconds: 60 }, 429);
   }
   await next();
+});
+
+// 防作弊检测器（L3-L5 补充检测层，HMAC 为主要防线）
+const antiCheat = createAntiCheatValidator({
+  // 30 分钟最小打卡间隔（比默认 7200s 更适合日常锻炼场景）
+  minCheckinIntervalSeconds: 1800,
 });
 
 // ============================================================
@@ -303,6 +310,28 @@ app.post('/api/checkin', authMiddleware, hmacMiddleware, async (c) => {
     return c.json({ error: '今日打卡次数已达上限（3次）' }, 429);
   }
 
+  // L3-L5 防作弊检测（补充层，HMAC 为主要防线）
+  {
+    // 获取最近一次打卡时间用于时间间隔检测
+    const prevCheckinTS = todayCheckin
+      ? await db.prepare('SELECT MAX(last_checkin_at) AS last_ts FROM checkins WHERE user_id = ?')
+          .bind(user_id).first<{ last_ts: number }>()
+      : null;
+
+    const result = antiCheat.validate(
+      { sets: sets_completed, reps_per_set, duration_per_contraction: hold_seconds, device_id },
+      { id: user_id, registered_device_id: user.device_id, created_at: user.created_at },
+      prevCheckinTS && prevCheckinTS.last_ts ? { last_checkin_at: prevCheckinTS.last_ts } : null,
+    );
+
+    if (!result.allowed) {
+      return c.json({ error: result.reason || '检测到异常行为' }, 403);
+    }
+    if (result.flags.length > 0) {
+      console.warn(`[anti-cheat] user=${user_id} flags: ${result.flags.join(', ')}`);
+    }
+  }
+
   // 写入打卡记录
   const checkinCount = todayCheckin ? todayCheckin.checkin_count + 1 : 1;
   await db.prepare(
@@ -352,6 +381,7 @@ app.post('/api/checkin', authMiddleware, hmacMiddleware, async (c) => {
 app.get('/api/leaderboard', async (c) => {
   const type: LeaderboardType = (c.req.query('type') as LeaderboardType) || 'alltime';
   const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100);
+  const offset = Math.max(parseInt(c.req.query('offset') || '0', 10), 0);
 
   const db = c.env.DB;
 
@@ -373,7 +403,7 @@ app.get('/api/leaderboard', async (c) => {
   const groupOrderLimit = `
     GROUP BY u.id
     ORDER BY (SUM(c.sets_completed) * 10 + u.streak * 5 + COUNT(CASE WHEN c.reps_per_set >= 15 THEN 1 END) * 5) DESC
-    LIMIT ?
+    LIMIT ? OFFSET ?
   `;
 
   let rows: D1Result<{
@@ -384,15 +414,15 @@ app.get('/api/leaderboard', async (c) => {
   if (type === 'weekly') {
     rows = await db.prepare(
       `SELECT ${cols} ${fromJoin} WHERE c.date >= ? ${groupOrderLimit}`,
-    ).bind(dateNDaysAgo(7), limit).all();
+    ).bind(dateNDaysAgo(7), limit, offset).all();
   } else if (type === 'monthly') {
     rows = await db.prepare(
       `SELECT ${cols} ${fromJoin} WHERE c.date >= ? ${groupOrderLimit}`,
-    ).bind(dateNDaysAgo(30), limit).all();
+    ).bind(dateNDaysAgo(30), limit, offset).all();
   } else {
     rows = await db.prepare(
       `SELECT ${cols} ${fromJoin} ${groupOrderLimit}`,
-    ).bind(limit).all();
+    ).bind(limit, offset).all();
   }
 
   const entries: LeaderboardEntry[] = rows.results.map((row, idx) => {
@@ -400,7 +430,7 @@ app.get('/api/leaderboard', async (c) => {
     const displayName = (row.opt_in_leaderboard && row.privacy_mode !== 1) ? row.display_name : '匿名用户';
     return {
       id: row.id,
-      rank: idx + 1,
+      rank: offset + idx + 1,
       name: displayName,
       score,
       streak: row.streak,
