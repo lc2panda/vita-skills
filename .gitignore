@@ -8,3 +8,14 @@ __tests__/
 test/
 *.test.*
 *.spec.*
+
+# 设计手稿 — 本地保留，禁止提交
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+references/eye-care-research.md
+references/hydration-research.md
+references/kegel-research.md
+references/leaderboard-research.md
+references/sedentary-research.md
+references/skills-spec-research.md

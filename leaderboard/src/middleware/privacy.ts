@@ -23,7 +23,7 @@ const DEFAULT_CONFIG: Required<PrivacyConfig> = {
 export interface UserRecord {
   id: string;
   display_name: string;
-  privacy_mode?: string;
+  privacy_mode?: number;  // 0=public, 1=anonymous (INTEGER in D1)
   device_id?: string;
   ip?: string;
   [key: string]: unknown;
@@ -68,7 +68,7 @@ async function hashIP(ip: string): Promise<string> {
  * Sanitize a user record for API response.
  *
  * Transformations:
- * - privacy_mode='anonymous': display_name → '用户****'
+ * - privacy_mode=1 (anonymous): display_name → '用户****'
  * - device_id: removed from response
  * - ip: removed from response
  */
@@ -82,8 +82,8 @@ export function sanitizeUserResponse(
   for (const [key, value] of Object.entries(user)) {
     switch (key) {
       case 'display_name':
-        // Anonymize if privacy_mode is set to 'anonymous'
-        sanitized[key] = user.privacy_mode === 'anonymous' ? label : value;
+        // Anonymize if privacy_mode is set to anonymous (value 1)
+        sanitized[key] = user.privacy_mode === 1 ? label : value;
         break;
       case 'device_id':
       case 'ip':

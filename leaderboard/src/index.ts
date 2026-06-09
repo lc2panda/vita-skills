@@ -19,10 +19,14 @@ import type {
   UserRecord,
   CheckinRecord,
   BadgeRecord,
+  ChallengeRecord,
+  ChallengeDetailResponse,
 } from './types';
-import { BADGE_DEFINITIONS, computeLevel, computeCheckinScore } from './types';
+import { BADGE_DEFINITIONS, computeLevel, computeCheckinScore, computeLoyaltyTier } from './types';
 import { handleScheduled } from './cron/daily-stats';
 import { createAuthMiddleware } from './middleware/auth';
+import { hmacMiddleware } from './middleware/hmac';
+import { sanitizeUserResponse, sanitizeUserListResponse } from './middleware/privacy';
 
 // ============================================================
 // 应用初始化
@@ -238,6 +242,7 @@ async function authMiddleware(c: any, next: any) {
       message: 'Valid Bearer token required for this operation.',
     }, 401);
   }
+  c.set('userId', ctx.userId);
   await next();
 }
 
@@ -245,7 +250,7 @@ async function authMiddleware(c: any, next: any) {
 // 1. POST /api/checkin — 打卡上报（需 Bearer Token 认证）
 // ============================================================
 
-app.post('/api/checkin', authMiddleware, async (c) => {
+app.post('/api/checkin', authMiddleware, hmacMiddleware, async (c) => {
   const body = await c.req.json<CheckinRequest>();
   const { user_id, sets_completed, reps_per_set, hold_seconds, device_id } = body;
 
@@ -281,6 +286,13 @@ app.post('/api/checkin', authMiddleware, async (c) => {
     return c.json({ error: 'device_id 不匹配，请使用注册时的设备' }, 403);
   }
 
+  // 更新隐私模式（如果请求中包含 privacy_mode）
+  if (body.privacy_mode !== undefined) {
+    const pm = body.privacy_mode === 1 ? 1 : 0;
+    await db.prepare('UPDATE users SET privacy_mode = ? WHERE id = ?')
+      .bind(pm, user_id).run();
+  }
+
   // 每日打卡次数限制（最多 3 次）
   const todayCheckin = await db.prepare(
     'SELECT id, checkin_count FROM checkins WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1'
@@ -310,6 +322,13 @@ app.post('/api/checkin', authMiddleware, async (c) => {
   await db.prepare(
     'UPDATE users SET score = ?, streak = ?, best_streak = ?, level = ? WHERE id = ?'
   ).bind(newScore, streak, bestStreak, newLevel, user_id).run();
+
+  // 更新忠诚度积分（每次打卡 +10 基础分）
+  const loyaltyScore = (user.loyalty_score ?? 0) + 10;
+  const loyaltyTier = computeLoyaltyTier(loyaltyScore);
+  await db.prepare(
+    'UPDATE users SET loyalty_score = ?, loyalty_tier = ? WHERE id = ?'
+  ).bind(loyaltyScore, loyaltyTier, user_id).run();
 
   // 检查并授予成就
   const newAchievements = await checkAndAwardBadges(db, user_id, newScore, streak, reps_per_set);
@@ -345,6 +364,7 @@ app.get('/api/leaderboard', async (c) => {
   const cols = `
     u.id, u.display_name, u.opt_in_leaderboard,
     u.streak, u.level,
+    u.loyalty_score, u.loyalty_tier,
     SUM(c.sets_completed) AS total_sets,
     COUNT(CASE WHEN c.reps_per_set >= 15 THEN 1 END) AS perfect_count
   `;
@@ -357,7 +377,7 @@ app.get('/api/leaderboard', async (c) => {
 
   let rows: D1Result<{
     id: string; display_name: string; opt_in_leaderboard: number;
-    streak: number; level: string; total_sets: number; perfect_count: number;
+    streak: number; level: string; loyalty_score: number; loyalty_tier: string; total_sets: number; perfect_count: number;
   }>;
 
   if (type === 'weekly') {
@@ -383,6 +403,8 @@ app.get('/api/leaderboard', async (c) => {
       score,
       streak: row.streak,
       level: row.level,
+      loyalty_score: row.loyalty_score,
+      loyalty_tier: row.loyalty_tier,
     };
   });
 
@@ -413,11 +435,16 @@ app.get('/api/user/:id', async (c) => {
     'SELECT * FROM checkins WHERE user_id = ? ORDER BY date DESC, last_checkin_at DESC LIMIT 30'
   ).bind(userId).all<CheckinRecord>();
 
+  // 隐私脱敏: privacy_mode=1 时隐藏 display_name
+  const sanitizedUser = sanitizeUserResponse(user);
+
   const resp: UserDetailResponse = {
-    name: user.display_name,
+    name: sanitizedUser.display_name,
     score: user.score,
     streak: user.streak,
     level: user.level,
+    loyalty_score: user.loyalty_score,
+    loyalty_tier: user.loyalty_tier,
     achievements: badges.results,
     history: history.results,
   };
@@ -470,8 +497,8 @@ app.post('/api/user/register', async (c) => {
   const now = Math.floor(Date.now() / 1000);
 
   await c.env.DB.prepare(
-    `INSERT INTO users (id, display_name, device_id, token, created_at, score, streak, best_streak, level)
-     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 'bronze')`
+    `INSERT INTO users (id, display_name, device_id, token, created_at, score, streak, best_streak, level, loyalty_score, loyalty_tier)
+     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 'bronze', 0, 'F')`
   ).bind(userId, display_name.trim(), device_id, token, now).run();
 
   const resp: RegisterResponse = { user_id: userId, token };
@@ -557,6 +584,126 @@ app.get('/api/achievements/:user_id', async (c) => {
 
   const resp: AchievementResponse = { achievements: badges.results };
   return c.json(resp);
+});
+
+// ============================================================
+// PK 挑战系统
+// ============================================================
+
+// POST /api/challenge — 发起 PK 挑战
+app.post('/api/challenge', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId: string = (c as any).get('userId');
+
+  let body: { opponent_id?: string; start_date?: string; end_date?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const { opponent_id, start_date, end_date } = body;
+
+  if (!opponent_id) {
+    return c.json({ error: 'opponent_id is required' }, 400);
+  }
+  if (opponent_id === userId) {
+    return c.json({ error: 'Cannot challenge yourself' }, 400);
+  }
+
+  // 检查对手是否存在
+  const opponent = await db.prepare(
+    'SELECT id, display_name FROM users WHERE id = ?'
+  ).bind(opponent_id).first<{ id: string; display_name: string }>();
+  if (!opponent) {
+    return c.json({ error: 'Opponent not found' }, 404);
+  }
+
+  const challengeId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const start = start_date || now;
+  const end = end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  await db.prepare(`
+    INSERT INTO challenges (id, challenger_id, opponent_id, status, start_date, end_date, created_at)
+    VALUES (?, ?, ?, 'accepted', ?, ?, ?)
+  `).bind(challengeId, userId, opponent_id, start, end, now).run();
+
+  return c.json({
+    id: challengeId,
+    challenger_id: userId,
+    opponent_id,
+    status: 'accepted',
+    start_date: start,
+    end_date: end,
+    created_at: now,
+  }, 201);
+});
+
+// GET /api/challenges — 用户挑战列表
+app.get('/api/challenges', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId: string = (c as any).get('userId');
+  const status = c.req.query('status');
+
+  let query = `
+    SELECT c.*,
+           ch.display_name as challenger_name,
+           op.display_name as opponent_name
+    FROM challenges c
+    JOIN users ch ON c.challenger_id = ch.id
+    JOIN users op ON c.opponent_id = op.id
+    WHERE (c.challenger_id = ? OR c.opponent_id = ?)
+  `;
+  const params: any[] = [userId, userId];
+
+  if (status) {
+    query += ' AND c.status = ?';
+    params.push(status);
+  }
+  query += ' ORDER BY c.created_at DESC LIMIT 50';
+
+  const challenges = await db.prepare(query).bind(...params).all<ChallengeRecord & { challenger_name: string; opponent_name: string }>();
+  return c.json(challenges.results);
+});
+
+// GET /api/challenge/:id — 挑战详情（含双方当前分数）
+app.get('/api/challenge/:id', async (c) => {
+  const db = c.env.DB;
+  const challengeId = c.req.param('id');
+
+  const challenge = await db.prepare(`
+    SELECT c.*,
+           ch.display_name as challenger_name,
+           op.display_name as opponent_name
+    FROM challenges c
+    JOIN users ch ON c.challenger_id = ch.id
+    JOIN users op ON c.opponent_id = op.id
+    WHERE c.id = ?
+  `).bind(challengeId).first<ChallengeDetailResponse>();
+
+  if (!challenge) {
+    return c.json({ error: 'Challenge not found' }, 404);
+  }
+
+  // 计算双方在挑战期内的得分（动态计算，每个 set 计 10 分）
+  const challengerScore = await db.prepare(`
+    SELECT COALESCE(SUM(sets_completed) * 10, 0) as score
+    FROM checkins
+    WHERE user_id = ? AND created_at BETWEEN ? AND ?
+  `).bind(challenge.challenger_id, challenge.start_date, challenge.end_date).first<{ score: number }>();
+
+  const opponentScore = await db.prepare(`
+    SELECT COALESCE(SUM(sets_completed) * 10, 0) as score
+    FROM checkins
+    WHERE user_id = ? AND created_at BETWEEN ? AND ?
+  `).bind(challenge.opponent_id, challenge.start_date, challenge.end_date).first<{ score: number }>();
+
+  return c.json({
+    ...challenge,
+    challenger_score: challengerScore?.score ?? 0,
+    opponent_score: opponentScore?.score ?? 0,
+  });
 });
 
 // ============================================================

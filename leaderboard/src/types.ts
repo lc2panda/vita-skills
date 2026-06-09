@@ -71,6 +71,7 @@ export interface CheckinRequest {
   reps_per_set: number;
   hold_seconds: number;
   device_id: string;
+  privacy_mode?: number;  // 0=公开, 1=匿名 (客户端可选的隐私偏好更新)
 }
 
 export interface RegisterRequest {
@@ -95,6 +96,8 @@ export interface LeaderboardEntry {
   score: number;
   streak: number;
   level: string;
+  loyalty_score?: number;
+  loyalty_tier?: string;
 }
 
 export interface UserDetailResponse {
@@ -102,6 +105,8 @@ export interface UserDetailResponse {
   score: number;
   streak: number;
   level: string;
+  loyalty_score?: number;
+  loyalty_tier?: string;
   achievements: BadgeRecord[];
   history: CheckinRecord[];
 }
@@ -199,3 +204,15 @@ export const LOYALTY_THRESHOLDS: Record<LoyaltyTier, number> = {
     'E': 50,
     'F': 0
 };
+
+// 根据积分计算忠诚度等级
+export function computeLoyaltyTier(score: number): string {
+    const tiers = Object.entries(LOYALTY_THRESHOLDS) as [LoyaltyTier, number][];
+    let tier: LoyaltyTier = 'F';
+    for (const [t, threshold] of tiers) {
+        if (score >= threshold && LOYALTY_THRESHOLDS[t] >= LOYALTY_THRESHOLDS[tier]) {
+            tier = t;
+        }
+    }
+    return tier;
+}
