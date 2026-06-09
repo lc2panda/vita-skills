@@ -106,6 +106,31 @@ ensure_path() {
     fi
 }
 
+# ── 创建 _meta.json ───────────────────────────────────────────
+
+create_meta() {
+    local meta_file="${REPO_ROOT}/_meta.json"
+
+    # 仅在 _meta.json 不存在时创建（仓库可能已包含）
+    if [[ -f "${meta_file}" ]]; then
+        echo "  _meta.json 已存在，跳过创建"
+        return 0
+    fi
+
+    local now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+
+    cat > "${meta_file}" << EOF
+{
+  "ownerId": "local",
+  "slug": "${SKILL_NAME}",
+  "version": "1.0.0",
+  "publishedAt": ${now_ms}
+}
+EOF
+    echo "  _meta.json 已创建: ${meta_file}"
+}
+
+
 # ── 主流程 ────────────────────────────────────────────────────
 
 main() {
@@ -121,6 +146,7 @@ main() {
     link_skill
     link_bin
     ensure_path
+    create_meta
 
     echo ""
     printf "%b✓ .pandacc 集成完成%b\n" "${C_GREEN}" "${C_RESET}"
