@@ -146,7 +146,7 @@ cmd_status() {
             sedentary) label="久坐提醒";;
             eye-care)  label="护眼提醒";;
             hydration) label="喝水提醒";;
-            kegel)     label="凯格尔训练";;
+            kegel)     label="提肛训练";;
         esac
 
         local enabled
@@ -252,7 +252,7 @@ cmd_test() {
         "久坐提醒|起来动动吧！(测试消息)"
         "护眼提醒|看看远处休息一下！(测试消息)"
         "喝水提醒|喝杯水！(测试消息)"
-        "凯格尔训练|盆底肌训练时间！(测试消息)"
+        "提肛训练|盆底肌训练时间！(测试消息)"
     )
 
     for entry in "${entries[@]}"; do
@@ -325,7 +325,7 @@ cmd_leaderboard() {
     done
 
     echo "  完成提醒: ${total_completed} 次"
-    echo "  凯格尔:   ${kegel_count}/3 次"
+    echo "  提肛:   ${kegel_count}/3 次"
     echo ""
 
     local streak

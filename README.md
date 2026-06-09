@@ -52,12 +52,12 @@ Step A4 — 验证安装（交付前检查）
 Step A5 — 启动守护进程
   执行：bash ~/vita-skills/scripts/vita start
   验证：bash ~/vita-skills/scripts/vita status
-  预期：输出包含"运行中"和 PID，各模块状态（久坐/护眼/喝水/凯格尔）已列出。
+  预期：输出包含"运行中"和 PID，各模块状态（久坐/护眼/喝水/提肛）已列出。
   失败处理：查看日志 tail -50 ~/.vita/logs/scheduler.log
 
 Step A6 — 发送测试通知（端到端验证）
   执行：bash ~/vita-skills/scripts/vita test
-  预期：依次发送久坐/护眼/喝水/凯格尔四条测试通知。
+  预期：依次发送久坐/护眼/喝水/提肛四条测试通知。
   验证：用户确认收到桌面通知。若未收到，检查系统通知权限设置。
 
 Step A7 — 开机自启（可选）
