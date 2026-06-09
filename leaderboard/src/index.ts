@@ -13,6 +13,7 @@ import type {
   LeaderboardEntry,
   LeaderboardType,
   UserDetailResponse,
+  UserListItem,
   StreakResponse,
   StatsResponse,
   AchievementResponse,
@@ -398,6 +399,7 @@ app.get('/api/leaderboard', async (c) => {
     const score = row.total_sets * 10 + row.streak * 5 + row.perfect_count * 5;
     const displayName = (row.opt_in_leaderboard && row.privacy_mode !== 1) ? row.display_name : '匿名用户';
     return {
+      id: row.id,
       rank: idx + 1,
       name: displayName,
       score,
@@ -409,6 +411,30 @@ app.get('/api/leaderboard', async (c) => {
   });
 
   return c.json(entries);
+});
+
+// ============================================================
+// 3a. GET /api/users — 批量用户列表（脱敏）
+// ============================================================
+
+app.get('/api/users', async (c) => {
+  const db = c.env.DB;
+
+  const users = await db.prepare(
+    'SELECT id, display_name, score, streak, level, loyalty_score, loyalty_tier, privacy_mode FROM users ORDER BY score DESC'
+  ).all<UserRecord & { privacy_mode: number }>();
+
+  const list: UserListItem[] = users.results.map((u) => ({
+    id: u.id,
+    display_name: u.privacy_mode === 1 ? 'Anonymous' : u.display_name,
+    score: u.score,
+    streak: u.streak,
+    level: u.level,
+    loyalty_score: u.loyalty_score ?? 0,
+    loyalty_tier: u.loyalty_tier ?? 'F',
+  }));
+
+  return c.json(list);
 });
 
 // ============================================================

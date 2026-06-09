@@ -92,6 +92,7 @@ export interface CheckinResponse {
 }
 
 export interface LeaderboardEntry {
+  id: string;
   rank: number;
   name: string;
   score: number;
@@ -99,6 +100,16 @@ export interface LeaderboardEntry {
   level: string;
   loyalty_score?: number;
   loyalty_tier?: string;
+}
+
+export interface UserListItem {
+  id: string;
+  display_name: string;
+  score: number;
+  streak: number;
+  level: string;
+  loyalty_score: number;
+  loyalty_tier: string;
 }
 
 export interface UserDetailResponse {
