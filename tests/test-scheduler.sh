@@ -73,9 +73,9 @@ test_config_loading() {
         "read_config 'health-hydration.enabled' 'true' | grep -q 'true'" \
         "$(read_config 'health-hydration.enabled' 'true')"
 
-    assert "读取 kegel 模块" \
-        "read_config 'health-kegel.enabled' 'true' | grep -q 'true'" \
-        "$(read_config 'health-kegel.enabled' 'true')"
+    assert "读取 tigang 模块" \
+        "read_config 'health-tigang.enabled' 'true' | grep -q 'true'" \
+        "$(read_config 'health-tigang.enabled' 'true')"
 
     # 测试新增配置段
     assert "读取 daemon.tick_seconds" \
