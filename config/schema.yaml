@@ -117,7 +117,7 @@ properties:
         default: []
     required: [enabled, interval_minutes, target_per_drink_ml]
 
-  health-kegel:
+  health-tigang:
     type: object
     description: "提肛锻炼提醒模块"
     properties:

@@ -47,7 +47,7 @@ _ensure_dir "$(dirname "$STATE_FILE")"
 tigang_config() {
     local key="$1"
     local default="${2:-}"
-    read_config "health-kegel.${key}" "${default}"
+    read_config "health-tigang.${key}" "${default}"
 }
 
 # ── 日期计算 ────────────────────────────────────────────────────
@@ -293,7 +293,7 @@ JSONEOF
     cat >> "$cfg" <<YAMLEOF
 
 # ── 提肛锻炼提醒模块 ──
-health-kegel:
+health-tigang:
   gender: ${gender}
   start_date: "${start_date}"
   reminder_times: "${reminder_times}"
