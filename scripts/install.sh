@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Input:  安装模式 (auto|interactive)，由 vita setup 或其他脚本调用
-# Output: 创建 ~/.vita/ 目录结构，复制默认配置，可选 shell profile 集成和定时任务
+# Output: 创建 ~/.vita/ 目录结构，复制默认配置，可选 shell profile 集成；开机自启不再静默注册，需用户显式执行 'vita autostart enable'
 # Pos:    scripts/install.sh — 首次安装与配置向导
 
 # 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -218,14 +218,18 @@ setup_autostart() {
     echo "◆ 开机自启设置"
     echo "─────────────────────────────────────────"
 
-    if [[ "$MODE" == "interactive" ]]; then
-        read -r -p "是否设置开机自启？[Y/n] " confirm
-        confirm="${confirm:-y}"
-        if [[ ! "$confirm" =~ ^[Yy] ]]; then
-            echo "  已跳过"
-            echo ""
-            return
-        fi
+    if [[ "$MODE" != "interactive" ]]; then
+        echo "  开机自启需要手动设置: vita autostart enable"
+        echo ""
+        return
+    fi
+
+    read -r -p "是否设置开机自启？[Y/n] " confirm
+    confirm="${confirm:-y}"
+    if [[ ! "$confirm" =~ ^[Yy] ]]; then
+        echo "  已跳过"
+        echo ""
+        return
     fi
 
     if [[ "$(uname -s)" == "Darwin" ]]; then

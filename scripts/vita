@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Input:  命令行参数 — vita <命令> [参数]
-# Output: 执行相应子命令 (start/stop/status/config/log/test/setup/leaderboard/version)
+# Output: 执行相应子命令 (start/stop/status/config/log/test/setup/leaderboard/autostart/version)
 # Pos:    scripts/vita — CLI 入口，用户与 vita 系统的唯一交互界面
 
 # 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -55,7 +55,7 @@ usage() {
     echo "  test           测试所有 reminder 模块（发送测试通知）"
     echo "  setup          首次安装向导"
     echo "  leaderboard    查看打榜排名"
-    echo "  version        版本信息"
+    echo "  autostart      管理开机自启 (enable|disable|status)"
     echo ""
     echo "示例:"
     echo "  vita start      # 启动守护"
@@ -335,6 +335,125 @@ cmd_leaderboard() {
     echo "完整打榜功能将在 v0.2.0 开放。"
 }
 
+# ── autostart ────────────────────────────────────────────
+
+cmd_autostart() {
+    local subcmd="${1:-}"
+    case "$subcmd" in
+        enable)
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                local plist_path="$HOME/Library/LaunchAgents/com.vanilla.vita.plist"
+                if [[ -f "$plist_path" ]]; then
+                    echo "LaunchAgent 已存在: $plist_path"
+                else
+                    cat > "$plist_path" << PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vanilla.vita</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${SCRIPT_DIR}/vita</string>
+        <string>start</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>${LOG_DIR_DEFAULT}/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>${LOG_DIR_DEFAULT}/launchd.log</string>
+</dict>
+</plist>
+PLISTEOF
+                fi
+                launchctl load "$plist_path" 2>/dev/null || true
+                echo "开机自启已启用 (LaunchAgent)"
+            else
+                local service_path="$HOME/.config/systemd/user/com.vanilla.vita.service"
+                mkdir -p "$HOME/.config/systemd/user"
+                if [[ -f "$service_path" ]]; then
+                    echo "systemd 单元已存在: $service_path"
+                else
+                    cat > "$service_path" << SYSTEMDEOF
+[Unit]
+Description=Vita Health Guardian
+
+[Service]
+ExecStart=${SCRIPT_DIR}/vita start
+ExecStop=${SCRIPT_DIR}/vita stop
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+SYSTEMDEOF
+                fi
+                systemctl --user daemon-reload 2>/dev/null || true
+                systemctl --user enable com.vanilla.vita.service 2>/dev/null || true
+                echo "开机自启已启用 (systemd)"
+            fi
+            ;;
+        disable)
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                local plist_path="$HOME/Library/LaunchAgents/com.vanilla.vita.plist"
+                if [[ -f "$plist_path" ]]; then
+                    launchctl unload "$plist_path" 2>/dev/null || true
+                    rm -f "$plist_path"
+                    echo "开机自启已禁用 (LaunchAgent 已移除)"
+                else
+                    echo "LaunchAgent 不存在，无需操作"
+                fi
+            else
+                local service_path="$HOME/.config/systemd/user/com.vanilla.vita.service"
+                systemctl --user disable com.vanilla.vita.service 2>/dev/null || true
+                rm -f "$service_path"
+                systemctl --user daemon-reload 2>/dev/null || true
+                echo "开机自启已禁用 (systemd 单元已移除)"
+            fi
+            ;;
+        status)
+            if [[ "$(uname -s)" == "Darwin" ]]; then
+                local plist_path="$HOME/Library/LaunchAgents/com.vanilla.vita.plist"
+                if [[ -f "$plist_path" ]]; then
+                    echo "开机自启: 已启用 (LaunchAgent: $plist_path)"
+                    if launchctl list com.vanilla.vita &>/dev/null; then
+                        echo "状态: 已加载"
+                    else
+                        echo "状态: 未加载 (plist 存在但未加载)"
+                    fi
+                else
+                    echo "开机自启: 未启用"
+                fi
+            else
+                local service_path="$HOME/.config/systemd/user/com.vanilla.vita.service"
+                if [[ -f "$service_path" ]]; then
+                    echo "开机自启: 已启用 (systemd: $service_path)"
+                    if systemctl --user is-active com.vanilla.vita.service &>/dev/null; then
+                        echo "状态: 运行中"
+                    else
+                        echo "状态: 未运行"
+                    fi
+                else
+                    echo "开机自启: 未启用"
+                fi
+            fi
+            ;;
+        *)
+            echo "用法: vita autostart <enable|disable|status>"
+            echo ""
+            echo "管理开机自启设置:"
+            echo "  enable   启用开机自启"
+            echo "  disable  禁用开机自启"
+            echo "  status   查看开机自启状态"
+            ;;
+    esac
+}
+
 # ── version ───────────────────────────────────────────────
 
 cmd_version() {
@@ -358,6 +477,7 @@ case "$VITA_CMD" in
     test)         cmd_test ;;
     setup)        cmd_setup ;;
     leaderboard)  cmd_leaderboard ;;
+    autostart)    shift 2>/dev/null || true; cmd_autostart "$@" ;;
     version|--version|-v|-V) cmd_version ;;
     help|--help|-h) usage ;;
     *)
