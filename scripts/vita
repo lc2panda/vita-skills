@@ -320,7 +320,7 @@ cmd_leaderboard() {
     local kegel_count=0
     for t in "0900" "1400" "2000"; do
         local triggered
-        triggered=$(read_state "kegel_${date_key}_${t}" "0")
+        triggered=$(read_state "kegel" "kegel_${date_key}_${t}" "0")
         [[ "$triggered" == "1" ]] && ((kegel_count++)) || true
     done
 
@@ -329,7 +329,7 @@ cmd_leaderboard() {
     echo ""
 
     local streak
-    streak=$(read_state "leaderboard_streak" "0")
+    streak=$(read_state "system" "leaderboard_streak" "0")
     echo "连续打卡: ${streak} 天"
     echo ""
     echo "完整打榜功能将在 v0.2.0 开放。"
