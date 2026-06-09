@@ -313,7 +313,7 @@ cmd_leaderboard() {
     local total_completed=0
     for module in sedentary eye-care hydration; do
         local completed
-        completed=$(read_state "stats_${date_key}_completed" "0")
+        completed=$(read_state "$module" "stats_${date_key}_completed" "0")
         total_completed=$(( total_completed + completed ))
     done
 
