@@ -10,6 +10,10 @@ export interface UserRecord {
   id: string;
   display_name: string;
   device_id: string;
+  token?: string;
+  privacy_mode?: number;
+  loyalty_score?: number;
+  loyalty_tier?: string;
   created_at: number;
   opt_in_leaderboard: boolean;
   stage: string;
@@ -37,6 +41,24 @@ export interface BadgeRecord {
   user_id: string;
   badge_type: string;
   awarded_at: number;
+}
+
+export interface ChallengeRecord {
+  id: string;
+  challenger_id: string;
+  opponent_id: string;
+  status: 'pending' | 'accepted' | 'completed' | 'cancelled';
+  challenger_score: number;
+  opponent_score: number;
+  winner_id: string | null;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+export interface ChallengeDetailResponse extends ChallengeRecord {
+  challenger_name: string;
+  opponent_name: string;
 }
 
 // ============================================================
@@ -159,3 +181,21 @@ export function computeCheckinScore(sets: number, streak: number, reps: number):
   const perfectBonus = reps >= 15 ? 5 : 0;
   return base + streakBonus + perfectBonus;
 }
+
+// ============================================================
+// 忠诚度等级
+// ============================================================
+
+export const LOYALTY_TIERS = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS'] as const;
+export type LoyaltyTier = typeof LOYALTY_TIERS[number];
+
+export const LOYALTY_THRESHOLDS: Record<LoyaltyTier, number> = {
+    'SS': 5000,
+    'S': 3000,
+    'A': 2000,
+    'B': 1000,
+    'C': 500,
+    'D': 200,
+    'E': 50,
+    'F': 0
+};

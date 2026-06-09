@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
     display_name        TEXT NOT NULL,
     device_id           TEXT NOT NULL,
     token               TEXT,
+    privacy_mode        INTEGER DEFAULT 0,       -- 0=公开 1=匿名
+    loyalty_score       INTEGER DEFAULT 0,       -- 忠诚度积分
+    loyalty_tier        TEXT DEFAULT 'F',         -- SS/S/A/B/C/D/E/F 八级
     created_at          INTEGER NOT NULL DEFAULT (unixepoch()),
     opt_in_leaderboard  BOOLEAN NOT NULL DEFAULT 1,
     stage               TEXT NOT NULL DEFAULT 'beginner',
@@ -60,6 +63,26 @@ CREATE TABLE IF NOT EXISTS badges (
 );
 
 CREATE INDEX IF NOT EXISTS idx_badges_user ON badges(user_id);
+
+-- PK 挑战表
+CREATE TABLE IF NOT EXISTS challenges (
+    id TEXT PRIMARY KEY,
+    challenger_id TEXT NOT NULL,
+    opponent_id TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',  -- pending/accepted/completed/cancelled
+    challenger_score INTEGER DEFAULT 0,
+    opponent_score INTEGER DEFAULT 0,
+    winner_id TEXT,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (challenger_id) REFERENCES users(id),
+    FOREIGN KEY (opponent_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_challenges_challenger ON challenges(challenger_id);
+CREATE INDEX IF NOT EXISTS idx_challenges_opponent ON challenges(opponent_id);
+CREATE INDEX IF NOT EXISTS idx_challenges_status ON challenges(status);
 
 -- ============================================================
 -- 表 4: daily_stats — 每日统计表（物化视图替代）
