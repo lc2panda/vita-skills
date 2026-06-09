@@ -18,7 +18,7 @@ database_id = "bb7d4268-af7c-4cbc-9b2d-23fa8cefd848"
 # ============================================
 [[kv_namespaces]]
 binding = "KV_CACHE"
-id = "YOUR_KV_ID_HERE"  # ← 替换为实际 KV id
+id = "b0aef3b5437f4909b0babb45d8fc4e21"
 
 # ============================================
 # 定时任务（每天凌晨1:00 UTC 聚合统计）
