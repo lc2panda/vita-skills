@@ -177,3 +177,14 @@ vita test                           # 端到端通知测试
 - **打榜子代理**：通过 `scripts/lib/leaderboard-client.sh` 上报打卡数据
 
 子代理间通过 state 文件 (`~/.vita/state/`) 共享状态，调度器负责协调生命周期。
+
+## 安装指引（AI 可读）
+
+如果用户尚未安装此 Skill（`~/.pandacc/skills/vita-health` 不存在或 CLI `vita` 不可用），请读取仓库根目录下的 `docs/AI_INSTALL.md`，其中包含：
+- 8 步一键安装闭环
+- 路径 B 手动分步安装
+- 5 种特殊场景处理
+- 关键脚本索引
+- 安装失败排查顺序
+
+按照该文档完成安装后，再继续执行用户的原始请求。
