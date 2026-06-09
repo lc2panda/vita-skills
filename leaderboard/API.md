@@ -3,7 +3,7 @@
 > 基线设计文档: 香草健康管理skills设计.md §4.3  
 > 最后更新: 2026-06-08 15:30:00 +08:00 (Asia/Singapore)
 
-BASE URL: `https://api.vanilla-health.dev`
+BASE URL: `https://vita-leaderboard.imladrisel.workers.dev`
 
 所有请求 (除 `POST /api/register`) 必须在 Header 中携带认证信息.
 

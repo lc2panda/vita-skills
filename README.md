@@ -266,7 +266,7 @@ npx wrangler d1 execute vita-leaderboard-db --file=db/migrations/002_indexes.sql
 npx wrangler d1 execute vita-leaderboard-db --file=db/seed.sql --remote
 ```
 
-#### 本地开发
+#### 本地开发（仅调试，生产环境使用 Cloudflare Worker 全球排行榜）
 ```bash
 npx wrangler dev
 ```
@@ -288,7 +288,7 @@ npx wrangler deploy
 #### 打榜 API 端点
 部署后 CLI 配置：
 ```bash
-export VITA_LEADERBOARD_URL="https://vita-leaderboard.<your-subdomain>.workers.dev"
+export VITA_LEADERBOARD_URL="https://vita-leaderboard.imladrisel.workers.dev"
 ```
 
 详细 API 规格见 `leaderboard/API.md`（7 个端点：注册、打卡、排行榜、统计、挑战发起、挑战详情、徽章列表）。

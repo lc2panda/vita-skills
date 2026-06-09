@@ -60,7 +60,7 @@ health-leaderboard:
   enabled: false                 # 默认关闭，需用户主动开启
   opt_in_leaderboard: false      # 是否出现在公开排行榜
   display_name: "匿名战士"        # 排行榜显示名称
-  api_base_url: "https://api.vanilla-health.dev"
+  api_base_url: "https://vita-leaderboard.imladrisel.workers.dev"
 
 # ═══════════════════════════════════════════════════════════════
 # 调度守护设置（scheduler.sh 使用）

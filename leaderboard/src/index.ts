@@ -48,7 +48,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 function getClientIP(request: Request): string {
   return request.headers.get('CF-Connecting-IP')
     || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim()
-    || '127.0.0.1';
+    || 'unknown';
 }
 
 function checkIPRateLimit(ip: string): boolean {

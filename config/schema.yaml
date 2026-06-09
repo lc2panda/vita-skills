@@ -183,7 +183,7 @@ properties:
       api_base_url:
         type: string
         format: uri
-        default: "https://api.vanilla-health.dev"
+        default: "https://vita-leaderboard.imladrisel.workers.dev"
     required: [enabled]
 
 additionalProperties: false

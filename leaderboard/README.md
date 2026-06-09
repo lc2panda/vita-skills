@@ -28,7 +28,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-## 本地开发
+## 本地开发（仅调试，生产环境使用 Cloudflare Worker 全球排行榜）
 
 ```bash
 npm run dev

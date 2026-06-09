@@ -33,7 +33,7 @@ _lb_api_base() {
         fi
     fi
     if [[ -z "$url" ]]; then
-        url="https://api.vanilla-health.dev"
+        url="https://vita-leaderboard.imladrisel.workers.dev"
     fi
     # 去除尾部斜杠
     echo "${url%/}"
