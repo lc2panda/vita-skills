@@ -3,7 +3,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
-#tests/ (解锁测试脚本) 
+tests/ 
 __tests__/
 test/
 *.test.*
