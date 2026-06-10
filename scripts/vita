@@ -140,20 +140,20 @@ cmd_status() {
 
     echo ""
     echo "模块状态:"
-    for module in sedentary eye-care hydration kegel; do
+    for module in sedentary eye-care hydration tigang; do
         local label
         case "$module" in
             sedentary) label="久坐提醒";;
             eye-care)  label="护眼提醒";;
             hydration) label="喝水提醒";;
-            kegel)     label="提肛训练";;
+            tigang)    label="提肛训练";;
         esac
 
         local enabled
         enabled=$(cfg "health-${module}.enabled" "true")
         if [[ "$enabled" == "true" ]]; then
             printf "  %b✓%b %s" "$(_green)" "$(_reset)" "$label"
-            if [[ "$module" == "kegel" ]]; then
+            if [[ "$module" == "tigang" ]]; then
                 echo "  (固定时间: 09:00, 14:00, 20:00)"
             else
                 local interval
@@ -298,12 +298,8 @@ cmd_leaderboard() {
     echo "─────────────────────────────────────────"
 
     local nickname
-    nickname=$(cfg "global.nickname" "")
-    if [[ -z "$nickname" ]]; then
-        echo "尚未设置打榜昵称。运行 'vita setup' 设置。"
-    else
-        echo "打榜昵称: $nickname"
-    fi
+    nickname=$(cfg "health-leaderboard.display_name" "匿名战士")
+    echo "打榜昵称: ${nickname}"
 
     local date_key
     date_key=$(date '+%Y%m%d')
@@ -317,22 +313,89 @@ cmd_leaderboard() {
         total_completed=$(( total_completed + completed ))
     done
 
-    local kegel_count=0
+    local tigang_count=0
     for t in "0900" "1400" "2000"; do
         local triggered
-        triggered=$(read_state "kegel" "kegel_${date_key}_${t}" "0")
-        [[ "$triggered" == "1" ]] && ((kegel_count++)) || true
+        triggered=$(read_state "tigang" "tigang_${date_key}_${t}" "0")
+        [[ "$triggered" == "1" ]] && ((tigang_count++)) || true
     done
 
     echo "  完成提醒: ${total_completed} 次"
-    echo "  提肛:   ${kegel_count}/3 次"
+    echo "  提肛:   ${tigang_count}/3 次"
     echo ""
 
     local streak
     streak=$(read_state "system" "leaderboard_streak" "0")
     echo "连续打卡: ${streak} 天"
     echo ""
-    echo "完整打榜功能将在 v0.2.0 开放。"
+
+    # ── 尝试调用真实排行榜 API ──────────────────────────
+    local lb_available=false
+    if [[ -f "$SCRIPT_DIR/lib/leaderboard-client.sh" ]]; then
+        # shellcheck source=lib/leaderboard-client.sh
+        source "$SCRIPT_DIR/lib/leaderboard-client.sh"
+        if declare -f lb_get_leaderboard &>/dev/null; then
+            lb_available=true
+        fi
+    fi
+
+    if [[ "$lb_available" != "true" ]]; then
+        echo "排行榜数据暂不可用 (leaderboard-client.sh 未找到或函数未加载)。"
+        echo "提示: 确保 leaderboard-client.sh 存在且可访问。"
+        return 0
+    fi
+
+    # ── 获取并显示排行榜 ─────────────────────────────────
+    local board_parse rank_val name_val score_val streak_val line
+    board="$(lb_get_leaderboard "weekly" 2>/dev/null)" || true
+
+    if [[ -z "$board" ]] || [[ "$board" == "[]" ]]; then
+        echo "  排行榜暂无数据"
+        echo ""
+        return 0
+    fi
+
+    echo " weekly 排行榜 "
+    printf "  %-4s %-20s %-8s %-6s\n" "排名" "昵称" "积分" "连续"
+    printf "  %-4s %-20s %-8s %-6s\n" "----" "--------------------" "--------" "------"
+
+    while IFS='|' read -r rank_val name_val score_val streak_val; do
+        [[ -z "$rank_val" ]] && continue
+        printf "  %-4s %-20s %-8s %-6s\n" "#${rank_val}" "${name_val:-?}" "${score_val:-0}" "${streak_val:-0}"
+    done <<< "$(echo "$board" | python3 -c 'import sys, json
+try:
+    data = json.load(sys.stdin)
+    for item in data:
+        rank = str(item.get("rank", ""))
+        name = str(item.get("name", item.get("display_name", "?")))
+        score = str(item.get("score", "0"))
+        streak = str(item.get("streak", "0"))
+        print(f"{rank}|{name}|{score}|{streak}")
+except Exception:
+    pass
+')"
+
+    echo ""
+
+    # ── 获取当前用户排名 ─────────────────────────────────
+    local user_id my_rank_data parsed_rank parsed_score
+    user_id=""
+    if declare -f lb_get_user_id &>/dev/null; then
+        user_id="$(lb_get_user_id 2>/dev/null)" || true
+    fi
+
+    if [[ -n "$user_id" ]]; then
+        my_rank_data="$(lb_get_rank "$user_id" 2>/dev/null)" || true
+        # lb_get_rank 返回 JSON 中 rank 字段名为 "rank_text"
+        parsed_rank="$(echo "$my_rank_data" | python3 -c 'import sys, json; data=json.load(sys.stdin); r=data.get("rank_text"); print(r if r is not None else "")' 2>/dev/null)" || true
+        parsed_score="$(echo "$my_rank_data" | python3 -c 'import sys, json; data=json.load(sys.stdin); s=data.get("score"); print(s if s is not None else "")' 2>/dev/null)" || true
+        if [[ -n "$parsed_rank" ]]; then
+            printf "  我的排名: #%-4s | 积分: %-8s\n" "$parsed_rank" "${parsed_score:-0}"
+        fi
+    fi
+
+    echo "提示: 使用 vita leaderboard weekly|monthly|alltime 切换周期"
+    return 0
 }
 
 # ── autostart ────────────────────────────────────────────
@@ -469,6 +532,10 @@ if [[ -z "$VITA_CMD" ]]; then
 fi
 
 case "$VITA_CMD" in
+    tigang)
+        shift
+        exec "$SCRIPT_DIR/tigang.sh" "$@"
+        ;;
     start)        cmd_start ;;
     stop)         cmd_stop ;;
     status)       cmd_status ;;
