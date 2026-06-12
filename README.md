@@ -155,7 +155,7 @@ B10 — 交付确认（同 A8）
 场景 5：守护进程已在运行
   → 先停止旧进程再启动：
     bash ~/vita-skills/scripts/vita stop
-    bash ~/vita-skills/scripts/vita start --force
+    bash ~/vita-skills/scripts/vita start
 
 ═══════════════════════════════════════════════════════════
 关键脚本索引（供 AI 直接调用）
