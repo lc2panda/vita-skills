@@ -3,6 +3,7 @@
 - vita: CLI 入口（用户唯一交互界面）
 - install.sh: 首次安装与配置向导（含 .pandacc 自动集成）
 - pandacc-install.sh: .pandacc 体系专用集成安装器
+- marketplace-install.sh: marketplace 一键安装入口（curl pipe 调用）
 - scheduler.sh: 统一调度守护
 - sedentary.sh: 久坐提醒脚本，支持 --remind/--status/--daemon
 - eye-care.sh: 用眼提醒
