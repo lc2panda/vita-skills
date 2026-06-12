@@ -188,7 +188,6 @@ vita-skills/
 ├── SKILL.md                            # AI Agent Skills 协议入口
 ├── CHANGELOG.md                        # 版本变更记录
 ├── CONTRIBUTING.md                     # 贡献指南
-├── 香草健康管理skills设计.md            # 系统设计文档
 ├── scripts/                            # 运行时代码
 │   ├── vita                            # CLI 入口（用户唯一交互界面）
 │   ├── install.sh                      # 首次安装与配置向导
@@ -218,16 +217,17 @@ vita-skills/
 │   └── README.md
 ├── leaderboard/                        # 打榜 PK 服务（Cloudflare Workers + D1 + KV）
 │   ├── README.md                       # 部署与运行说明
-│   ├── API.md                          # 7 个 REST API 端点规格
+│   ├── API.md                          # 12 个 REST API 端点规格
 │   ├── tests/
 │   │   └── api.test.sh                 # API 测试脚本
 │   └── ...                             # Workers 源码与依赖
-├── sedentary-research.md               # 久坐提醒研究文献
-├── eye-care-research.md                # 用眼提醒研究文献
-├── hydration-research.md               # 喝水提醒研究文献
-├── tigang-research.md                   # 提肛训练研究文献
-├── leaderboard-research.md             # 打榜系统研究文献
-└── skills-spec-research.md             # Skills 协议规范研究
+├── references/                         # 研究文献与设计文档
+│   ├── sedentary-research.md           # 久坐提醒研究文献
+│   ├── eye-care-research.md            # 用眼提醒研究文献
+│   ├── hydration-research.md           # 喝水提醒研究文献
+│   ├── kegel-research.md               # 提肛训练研究文献
+│   ├── leaderboard-research.md         # 打榜系统研究文献
+│   └── skills-spec-research.md         # Skills 协议规范研究
 ```
 
 ---
@@ -299,8 +299,8 @@ vita test           # 发送测试通知，验证各模块正常
 
 | 命令 | 说明 | 示例 |
 |------|------|------|
-| `vita start [--force]` | 启动后台守护进程 | `vita start` |
-| `vita stop [--force]` | 停止守护进程，清理 PID/Lock 文件 | `vita stop` |
+| `vita start` | 启动后台守护进程 | `vita start` |
+| `vita stop` | 停止守护进程，清理 PID/Lock 文件 | `vita stop` |
 | `vita status` | 查看运行状态、今日统计、忠诚度评分与段位、守护 PID | `vita status` |
 | `vita config` | 打印当前生效配置（合并 `~/.vita/config/config.yaml`） | `vita config` |
 | `vita config edit` | 在默认编辑器中打开配置文件 | `vita config edit` |
@@ -309,19 +309,21 @@ vita test           # 发送测试通知，验证各模块正常
 | `vita test` | 发送所有已启用模块的测试通知 | `vita test` |
 | `vita setup` | 重新运行交互式安装向导（配置、打榜注册、自启等） | `vita setup` |
 | `vita leaderboard` | 查看全球打榜排名、个人连续打卡天数与段位 | `vita leaderboard` |
+| `vita tigang <子命令>` | 透传提肛训练模块（`--init/--remind/--done/--status/--leaderboard/--daemon/--help`） | `vita tigang --status` |
+| `vita autostart <子命令>` | 系统自启管理（`enable/disable/status`）：macOS 通过 LaunchAgent、Linux 通过 systemd | `vita autostart enable` |
 | `vita version` / `vita -v` | 打印版本信息 | `vita version` |
 | `vita help` / `vita -h` | 打印帮助信息 | `vita help` |
 
 ### 独立运行各模块（调试/手动触发）
 
-每个模块脚本都可以脱离调度器独立运行，支持自检测模式（`--daemon`）和手动单次触发（`--once`）：
+每个模块脚本都可以脱离调度器独立运行，支持守护模式（`--daemon`）和手动触发：
 
-| 脚本 | 模式 | 示例 |
-|------|------|------|
-| `scripts/sedentary.sh` | `--daemon` 守护 / `--once` 单次 | `bash scripts/sedentary.sh --once` |
-| `scripts/eye-care.sh` | `--daemon` 守护 / `--once` 单次 | `bash scripts/eye-care.sh --once` |
-| `scripts/hydration.sh` | `--daemon` 守护 / `--once` 单次 | `bash scripts/hydration.sh --once` |
-| `scripts/tigang.sh` | `--daemon` 守护 / `--once` 单次 | `bash scripts/tigang.sh --once` |
+| 脚本 | 可用参数 | 示例 |
+|------|---------|------|
+| `scripts/sedentary.sh` | `--remind` 立即检查 / `--status` 查看状态 / `--reset` 重置计时 / `--daemon` 守护 | `bash scripts/sedentary.sh --remind` |
+| `scripts/eye-care.sh` | `--remind` 发送提醒 / `--status` 查看状态 / `--daemon` 守护 | `bash scripts/eye-care.sh --remind` |
+| `scripts/hydration.sh` | `--drink` 记录饮水 / `--status` 查看状态 / `--daemon` 守护 / `--reset` 重置 | `bash scripts/hydration.sh --status` |
+| `scripts/tigang.sh` | `--init` 初始化 / `--remind` 发送提醒 / `--done [N]` 确认完成 / `--status` 查看状态 / `--leaderboard` 排名 / `--daemon` 守护 / `--help` 帮助 | `bash scripts/tigang.sh --status` |
 | `scripts/flow-detector.sh` | 检测当前心流等级与倍率 | `bash scripts/flow-detector.sh` |
 | `scripts/adaptive-engine.sh` | `completed\|dismissed\|snoozed` 响应 | `bash scripts/adaptive-engine.sh sedentary completed` |
 | `scripts/channel-adapter.sh` | `模块名 消息文本 notification_style` | `bash scripts/channel-adapter.sh hydration "该喝水了" normal` |
@@ -454,7 +456,7 @@ npx wrangler deploy
 export VITA_LEADERBOARD_URL="https://vita-leaderboard.imladrisel.workers.dev"
 ```
 
-详细 API 规格见 `leaderboard/API.md`（7 个端点：注册、打卡、排行榜、统计、挑战发起、挑战详情、徽章列表）。
+详细 API 规格见 `leaderboard/API.md`（12 个端点：健康检查、用户注册、打卡、排行榜、用户列表、用户详情、连续打卡、全局统计、成就、创建挑战、挑战列表、挑战详情）。
 
 ### 客户端集成
 
@@ -483,7 +485,7 @@ export VITA_LEADERBOARD_URL="https://vita-leaderboard.imladrisel.workers.dev"
 | 喝水提醒 | 14+ | NASEM, EFSA, 中国营养学会, Wittbrodt Meta | `references/health-guidelines.md` 第三节 |
 | 提肛训练 | 11+ | Cochrane 2024 (63 RCT/4,920 人), Cleveland Clinic, NIH/NIDDK | `references/health-guidelines.md` 第四节 |
 
-完整来源列表与交叉验证矩阵见 `references/health-guidelines.md` 第五节。研究文献检索记录见根目录各 `*-research.md` 文件。
+完整来源列表与交叉验证矩阵见 `references/health-guidelines.md` 第五节。研究文献检索记录见 `references/` 目录下各 `*-research.md` 文件。
 
 ---
 
