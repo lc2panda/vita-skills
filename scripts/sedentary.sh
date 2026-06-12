@@ -128,8 +128,8 @@ do_remind() {
         log_message "INFO" "$MODULE" "深夜静默，跳过提醒"
         return 0
     fi
-    # 注：is_screen_locked 在部分 macOS 版本存在误报，暂不启用
-    # 用户可通过手动锁定屏幕 + 系统勿扰模式控制通知
+    # KNOWN-LIMITATION: is_screen_locked 在部分 macOS 版本存在误报，已禁用
+    # 用户可通过 suppression.sh 中的其他抑制策略（空闲检测/深夜模式）替代
 
     # 5. 心流检测
     local in_flow=false
