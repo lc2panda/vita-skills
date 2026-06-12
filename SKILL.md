@@ -118,14 +118,16 @@ vita config edit
 | `vita test` | 发送所有模块测试通知 |
 | `vita setup` | 重新运行安装向导 |
 | `vita leaderboard` | 查看打榜排名与连续打卡天数 |
+| `vita tigang <subcommand>` | 提肛训练子命令路由（`--init / --remind / --done [N] / --status / --leaderboard / --daemon / --help`） |
+| `vita autostart <action>` | 管理开机自启（`enable / disable / status`） |
 
-命令行入口：`scripts/vita`（bash 脚本，9 个子命令）
+命令行入口：`scripts/vita`（bash 脚本，11 个子命令）
 
 ## 打榜 PK 系统
 
 ### 服务端 — `leaderboard/`
 基于 Cloudflare Workers + D1 + KV 实现：
-- **11 个 REST API 端点**：注册、打卡、排行榜、用户信息、连胜记录、全局统计、徽章列表、挑战发起、挑战列表、挑战详情、健康检查
+- **12 个 REST API 端点**：`/api/health`、`/api/user/register`、`/api/checkin`、`/api/leaderboard`、`/api/users`、`/api/user/:id`、`/api/user/:id/streak`、`/api/stats`、`/api/achievements/:user_id`、`/api/challenge`、`/api/challenges`、`/api/challenge/:id`
 - **防作弊**：HMAC 签名验证、频率限制 (3 req/s)、时间窗口校验、异常检测
 - **隐私**：伪匿名 ID、部分掩码、可选匿名模式、可选退出排行榜、完整导出/删除
 - **成本**：完全覆盖在 Cloudflare 免费 Tier 内（预估月用量远低于免费额度）
@@ -164,7 +166,7 @@ vita test                           # 端到端通知测试
 | PFMT 为尿失禁一线疗法 (RR=8.38) | 3+ | *Cochrane* Dumoulin 2024 (63 RCT/4,920 participants) |
 | 渐进式提醒比固定频率更有效 | 2+ | Fogg Behavior Model, Hydroprompt 2016 |
 
-**完整科学依据、来源编号与交叉验证矩阵**详见 `references/health-guidelines.md`（45+ 独立来源）。各领域研究文献综述见根目录 `sedentary-research.md`、`eye-care-research.md`、`hydration-research.md`、`tigang-research.md`。
+**完整科学依据、来源编号与交叉验证矩阵**详见 `references/health-guidelines.md`（45+ 独立来源）。各领域研究文献综述见根目录 `sedentary-research.md`、`eye-care-research.md`、`hydration-research.md` 及 `references/kegel-research.md`。
 
 ## 子代理协作模式
 
