@@ -223,7 +223,7 @@ report_leaderboard() {
     [[ "$lb_enabled" != "true" ]] && return 0
 
     local user_id
-    user_id="$(lb_get_user_id 2>/dev/null)" || { log_message "DEBUG" "$MODULE" "打榜用户未注册，跳过上报"; return 0; }
+    user_id="$(lb_get_user_id 2>/dev/null)" || { log_message "INFO" "$MODULE" "打榜用户未注册，跳过上报"; return 0; }
 
     local state today_done
     state="$(_load_state)"
